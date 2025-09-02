@@ -1,0 +1,16 @@
+# Backup of original .htaccess
+# If you're still getting errors, delete the .htaccess file temporarily
+# to test if that's the cause
+
+# WebRTC Audio Conference - Minimal Configuration
+RewriteEngine On
+
+# Force HTTPS only for non-localhost
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP_HOST} !^localhost$ [NC]
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Basic file protection
+<Files "*.db">
+    Require all denied
+</Files>

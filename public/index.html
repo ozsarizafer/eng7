@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
+    <!-- Security Headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; connect-src 'self' wss: ws:">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+    
+    <title>WebRTC Video Call</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem;
+            text-align: center;
+            color: white;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        input, button {
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        button:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .audio-container {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .audio-controls {
+            text-align: center;
+        }
+
+        .audio-label {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 1.5rem;
+        }
+
+        .participants-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .participant {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .participant.local {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea20, #764ba220);
+        }
+
+        .participant.connected {
+            border-color: #4CAF50;
+            background: linear-gradient(135deg, #4CAF5020, #45a04920);
+        }
+
+        .participant.speaking {
+            border-color: #FF9800;
+            background: linear-gradient(135deg, #FF980020, #f5761920);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .participant-avatar {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .participant-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.25rem;
+        }
+
+        .participant-status {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        audio {
+            display: none;
+        }
+
+        .network-info {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #4CAF50;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .network-info h4 {
+            color: #4CAF50;
+            margin: 0 0 1rem 0;
+            font-size: 1.1rem;
+        }
+
+        .network-info p {
+            margin: 0.5rem 0;
+            color: #333;
+        }
+
+        .network-info code {
+            background: #f1f3f4;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #1976d2;
+            word-break: break-all;
+        }
+
+        .network-info small {
+            color: #666;
+            font-style: italic;
+        }
+
+        .status {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 1rem;
+            border-radius: 15px;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-connected { background: #4CAF50; }
+        .status-connecting { background: #FF9800; }
+        .status-disconnected { background: #F44336; }
+
+        .peers-list {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 1rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .peer-item {
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: #f5f5f5;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .call-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .call-button:hover {
+            background: #45a049;
+        }
+
+        @media (max-width: 768px) {
+            .participants-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 1rem;
+            }
+            
+            .participant {
+                padding: 1rem;
+            }
+            
+            .participant-avatar {
+                font-size: 2rem;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎙️ Audio Conference Room</h1>
+        <p>4-person voice chat with WebRTC signaling</p>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <div class="input-group">
+                <input type="text" id="usernameInput" placeholder="Your username" />
+                <input type="text" id="roomInput" placeholder="Room ID (default: 'default')" value="default" />
+                <button id="joinBtn">Join Room</button>
+                <button id="leaveBtn" disabled>Leave Room</button>
+            </div>
+            <div class="input-group">
+                <button id="startAudioBtn" disabled>Join Audio</button>
+                <button id="stopAudioBtn" disabled>Leave Audio</button>
+                <button id="muteBtn" disabled>Mute</button>
+                <button id="unmuteBtn" disabled>Unmute</button>
+            </div>
+        </div>
+
+        <div class="status">
+            <span class="status-indicator status-disconnected" id="statusIndicator"></span>
+            <span id="statusText">Disconnected</span>
+            <span style="float: right;">Peer ID: <span id="peerIdDisplay">-</span></span>
+        </div>
+
+        <div class="audio-container">
+            <div class="audio-controls">
+                <div class="audio-label">Audio Conference (Max 4 People)</div>
+                <div class="participants-grid" id="participantsGrid">
+                    <div class="participant local" id="localParticipant">
+                        <div class="participant-avatar">👤</div>
+                        <div class="participant-name">You</div>
+                        <div class="participant-status">Disconnected</div>
+                        <audio id="localAudio" muted></audio>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="peers-list">
+            <h3>Room Status</h3>
+            <div id="roomInfo">
+                <p>Capacity: <span id="roomCapacity">0/4</span></p>
+                <p>Room ID: <span id="currentRoom">-</span></p>
+            </div>
+            <div id="peersList">No peers connected</div>
+        </div>
+
+        <div id="messageContainer"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

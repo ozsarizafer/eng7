@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Connection Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .test-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 3rem;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+
+        .status {
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            font-weight: bold;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.testing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .test-results {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin: 1.5rem 0;
+        }
+
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .test-item:last-child {
+            border-bottom: none;
+        }
+
+        .test-result {
+            font-weight: bold;
+        }
+
+        .test-result.pass {
+            color: #28a745;
+        }
+
+        .test-result.fail {
+            color: #dc3545;
+        }
+
+        .test-result.pending {
+            color: #ffc107;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+
+        .connection-info {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        code {
+            background: #f1f3f4;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #1976d2;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        .troubleshooting {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #ff9800;
+        }
+        
+        .troubleshooting h3 {
+            color: #ff9800;
+            margin-bottom: 1rem;
+        }
+        
+        .troubleshooting ul {
+            margin-left: 1rem;
+        }
+        
+        .troubleshooting li {
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🌐 Network Connection Test</h1>
+        
+        <div class="connection-info">
+            <h3>📍 Connection Details</h3>
+            <p><strong>Current URL:</strong> <code id="currentUrl">-</code></p>
+            <p><strong>Protocol:</strong> <code id="currentProtocol">-</code></p>
+            <p><strong>Host:</strong> <code id="currentHost">-</code></p>
+            <p><strong>Detected IP:</strong> <code id="detectedIp">Detecting...</code></p>
+            <p><strong>Security Status:</strong> <span id="securityStatus">-</span></p>
+        </div>
+
+        <div class="status testing" id="testStatus">
+            🔄 Click "Run Tests" to check connectivity
+        </div>
+
+        <div class="test-results" id="testResults" style="display: none;">
+            <h4>Test Results:</h4>
+            <div class="test-item">
+                <span>HTTPS Security</span>
+                <span class="test-result pending" id="httpsTest">⏳ Pending</span>
+            </div>
+            <div class="test-item">
+                <span>API Endpoint Reachable</span>
+                <span class="test-result pending" id="apiTest">⏳ Pending</span>
+            </div>
+            <div class="test-item">
+                <span>Database Connection</span>
+                <span class="test-result pending" id="dbTest">⏳ Pending</span>
+            </div>
+            <div class="test-item">
+                <span>WebRTC STUN Servers</span>
+                <span class="test-result pending" id="stunTest">⏳ Pending</span>
+            </div>
+            <div class="test-item">
+                <span>Microphone Access</span>
+                <span class="test-result pending" id="micTest">⏳ Pending</span>
+            </div>
+        </div>
+
+        <button onclick="runConnectivityTests()">🧪 Run Tests</button>
+        <button onclick="window.location.href='index.html'">🎙️ Go to Audio Conference</button>
+        <button onclick="window.location.href='https_setup.php'">🔒 HTTPS Setup</button>
+        <button onclick="window.location.href='network_setup.php'">⚙️ Network Setup Guide</button>
+        <button onclick="window.open('test_api.php', '_blank')">📝 Test API Direct</button>
+    </div>
+    
+    <div class="troubleshooting" id="troubleshooting" style="display: none;">
+        <h3>🔧 Troubleshooting</h3>
+        <div id="troubleshootingContent"></div>
+    </div>
+
+    <script>
+        // Display current connection info
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('currentProtocol').textContent = window.location.protocol;
+        document.getElementById('currentHost').textContent = window.location.host;
+        
+        // Check security status
+        const isHttps = window.location.protocol === 'https:';
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        let securityStatus = '';
+        if (isHttps) {
+            securityStatus = '🔒 Secure (HTTPS)';
+        } else if (isLocalhost) {
+            securityStatus = '🟡 Development (HTTP on localhost)';
+        } else {
+            securityStatus = '⚠️ Insecure (HTTP on network)';
+        }
+        document.getElementById('securityStatus').innerHTML = securityStatus;
+
+        // Get base API URL
+        function getApiBase() {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            
+            let apiBase = `${protocol}//${hostname}`;
+            if (port && port !== '80' && port !== '443') {
+                apiBase += `:${port}`;
+            }
+            
+            const pathname = window.location.pathname;
+            const basePath = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+            apiBase += basePath;
+            
+            return apiBase;
+        }
+
+        // Detect local IP
+        async function detectLocalIp() {
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                pc.createDataChannel('');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                return new Promise((resolve) => {
+                    pc.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            const candidate = event.candidate.candidate;
+                            const ipMatch = candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
+                            if (ipMatch && !ipMatch[1].startsWith('127.') && !ipMatch[1].startsWith('169.254.')) {
+                                document.getElementById('detectedIp').textContent = ipMatch[1];
+                                pc.close();
+                                resolve(ipMatch[1]);
+                                return;
+                            }
+                        }
+                    };
+                    
+                    setTimeout(() => {
+                        document.getElementById('detectedIp').textContent = 'Could not detect';
+                        pc.close();
+                        resolve(null);
+                    }, 3000);
+                });
+            } catch (error) {
+                document.getElementById('detectedIp').textContent = 'Detection failed';
+                return null;
+            }
+        }
+
+        // Run connectivity tests
+        async function runConnectivityTests() {
+            const apiBase = getApiBase();
+            const testStatus = document.getElementById('testStatus');
+            const testResults = document.getElementById('testResults');
+            
+            testStatus.textContent = '🔄 Running tests...';
+            testStatus.className = 'status testing';
+            testResults.style.display = 'block';
+
+            // Test 0: HTTPS Security
+            const isHttps = window.location.protocol === 'https:';
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
+            if (isHttps) {
+                document.getElementById('httpsTest').textContent = '✅ HTTPS Active';
+                document.getElementById('httpsTest').className = 'test-result pass';
+            } else if (isLocalhost) {
+                document.getElementById('httpsTest').textContent = '🟡 HTTP (Localhost OK)';
+                document.getElementById('httpsTest').className = 'test-result pass';
+            } else {
+                document.getElementById('httpsTest').textContent = '⚠️ HTTP (HTTPS Recommended)';
+                document.getElementById('httpsTest').className = 'test-result fail';
+            }
+
+            // Test 1: API Endpoint
+            try {
+                // First try the simple test endpoint
+                console.log('Testing simple API endpoint:', apiBase + 'test_api.php');
+                const testResponse = await fetch(apiBase + 'test_api.php', {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (testResponse.ok) {
+                    const testResult = await testResponse.json();
+                    console.log('Test API Response:', testResult);
+                    
+                    if (testResult.success) {
+                        // Now try the main API endpoint
+                        console.log('Testing main API endpoint:', apiBase + 'api.php?action=peers&roomId=test');
+                        const response = await fetch(apiBase + 'api.php?action=peers&roomId=test', {
+                            method: 'GET',
+                            cache: 'no-cache',
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+                        
+                        console.log('Main API Response status:', response.status);
+                        
+                        if (!response.ok) {
+                            throw new Error(`Main API HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const result = await response.json();
+                        console.log('Main API Response data:', result);
+                        
+                        if (result.success !== undefined) {
+                            document.getElementById('apiTest').textContent = '✅ Pass';
+                            document.getElementById('apiTest').className = 'test-result pass';
+                        } else {
+                            throw new Error('Invalid response structure from main API');
+                        }
+                    } else {
+                        throw new Error('Test API returned failure: ' + testResult.error);
+                    }
+                } else {
+                    throw new Error(`Test API HTTP ${testResponse.status}: ${testResponse.statusText}`);
+                }
+            } catch (error) {
+                console.error('API Test failed:', error);
+                document.getElementById('apiTest').textContent = `❌ Fail: ${error.message}`;
+                document.getElementById('apiTest').className = 'test-result fail';
+            }
+
+            // Test 2: Database Connection (implicit in API test)
+            try {
+                console.log('Testing database setup page:', apiBase + 'setup_db.php');
+                const response = await fetch(apiBase + 'setup_db.php', {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                console.log('DB Setup Response status:', response.status);
+                
+                if (response.ok) {
+                    document.getElementById('dbTest').textContent = '✅ Pass';
+                    document.getElementById('dbTest').className = 'test-result pass';
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Database test failed:', error);
+                document.getElementById('dbTest').textContent = `❌ Fail: ${error.message}`;
+                document.getElementById('dbTest').className = 'test-result fail';
+            }
+
+            // Test 3: STUN Servers
+            try {
+                const pc = new RTCPeerConnection({ 
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] 
+                });
+                
+                const hasStun = await new Promise((resolve) => {
+                    let candidateReceived = false;
+                    
+                    pc.onicecandidate = (event) => {
+                        if (event.candidate && !candidateReceived) {
+                            candidateReceived = true;
+                            resolve(true);
+                        }
+                    };
+                    
+                    pc.createDataChannel('test');
+                    pc.createOffer().then(offer => pc.setLocalDescription(offer));
+                    
+                    setTimeout(() => {
+                        if (!candidateReceived) resolve(false);
+                    }, 5000);
+                });
+
+                pc.close();
+                
+                if (hasStun) {
+                    document.getElementById('stunTest').textContent = '✅ Pass';
+                    document.getElementById('stunTest').className = 'test-result pass';
+                } else {
+                    document.getElementById('stunTest').textContent = '❌ Fail';
+                    document.getElementById('stunTest').className = 'test-result fail';
+                }
+            } catch (error) {
+                document.getElementById('stunTest').textContent = '❌ Fail';
+                document.getElementById('stunTest').className = 'test-result fail';
+            }
+
+            // Test 4: Microphone Access
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+                
+                document.getElementById('micTest').textContent = '✅ Pass';
+                document.getElementById('micTest').className = 'test-result pass';
+            } catch (error) {
+                document.getElementById('micTest').textContent = '❌ Fail (Permission denied)';
+                document.getElementById('micTest').className = 'test-result fail';
+            }
+
+            // Update overall status
+            const allTests = document.querySelectorAll('.test-result');
+            const failedTests = document.querySelectorAll('.test-result.fail');
+            
+            if (failedTests.length === 0) {
+                testStatus.textContent = '✅ All tests passed! Ready for audio conference.';
+                testStatus.className = 'status success';
+                document.getElementById('troubleshooting').style.display = 'none';
+            } else {
+                testStatus.textContent = `⚠️ ${failedTests.length} test(s) failed. Check configuration.`;
+                testStatus.className = 'status error';
+                showTroubleshooting(failedTests);
+            }
+        }
+        
+        function showTroubleshooting(failedTests) {
+            const troubleshooting = document.getElementById('troubleshooting');
+            const content = document.getElementById('troubleshootingContent');
+            
+            let suggestions = '<h4>Suggested Solutions:</h4><ul>';
+            
+            failedTests.forEach(test => {
+                const testName = test.parentElement.querySelector('span').textContent;
+                
+                switch(testName) {
+                    case 'API Endpoint Reachable':
+                        suggestions += '<li><strong>API Issue:</strong><ul>';
+                        suggestions += '<li>Check if Apache is running in XAMPP</li>';
+                        suggestions += '<li>Verify SSL certificate is properly configured</li>';
+                        suggestions += '<li>Try accessing <a href="test_api.php" target="_blank">test_api.php</a> directly</li>';
+                        suggestions += '<li>Check browser console for detailed error messages</li>';
+                        suggestions += '</ul></li>';
+                        break;
+                    case 'Database Connection':
+                        suggestions += '<li><strong>Database Issue:</strong><ul>';
+                        suggestions += '<li>Run <a href="setup_db.php" target="_blank">setup_db.php</a> to initialize database</li>';
+                        suggestions += '<li>Check file permissions for SQLite database</li>';
+                        suggestions += '</ul></li>';
+                        break;
+                    case 'WebRTC STUN Servers':
+                        suggestions += '<li><strong>STUN Server Issue:</strong><ul>';
+                        suggestions += '<li>Check internet connection</li>';
+                        suggestions += '<li>Verify firewall is not blocking WebRTC traffic</li>';
+                        suggestions += '</ul></li>';
+                        break;
+                    case 'Microphone Access':
+                        suggestions += '<li><strong>Microphone Issue:</strong><ul>';
+                        suggestions += '<li>Allow microphone access when prompted</li>';
+                        suggestions += '<li>HTTPS is required for microphone on non-localhost</li>';
+                        suggestions += '<li>Check browser microphone permissions</li>';
+                        suggestions += '</ul></li>';
+                        break;
+                }
+            });
+            
+            suggestions += '</ul>';
+            content.innerHTML = suggestions;
+            troubleshooting.style.display = 'block';
+        }
+
+        // Auto-detect IP on page load
+        detectLocalIp();
+    </script>
+</body>
+</html>
