@@ -92,6 +92,16 @@
             transform: none;
         }
 
+        #newRoomBtn {
+            background: #28a745;
+            border: 2px solid #1e7e34;
+        }
+
+        #newRoomBtn:hover:not(:disabled) {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
         .audio-container {
             background: rgba(255, 255, 255, 0.9);
             border-radius: 15px;
@@ -296,6 +306,146 @@
             margin: 1rem 0;
             border: 1px solid #c3e6cb;
         }
+
+        .available-rooms {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .available-rooms h3 {
+            margin: 0 0 1rem 0;
+            color: #333;
+            font-size: 1.2rem;
+        }
+
+        .room-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .refresh-btn {
+            background: #17a2b8;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            min-width: auto;
+        }
+
+        .refresh-btn:hover {
+            background: #138496;
+        }
+
+        .room-count {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            min-height: 60px;
+        }
+
+        .room-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .room-card:hover {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea20, #764ba220);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .room-card.full {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            border-color: #f5c6cb;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .room-card.full:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .room-card.current {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border-color: #28a745;
+        }
+
+        .room-id {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .room-name {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .room-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .room-participants {
+            background: #667eea;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+        }
+
+        .room-participants.full {
+            background: #dc3545;
+        }
+
+        .no-rooms {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 2rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px dashed #dee2e6;
+        }
+
+        .loading-rooms {
+            text-align: center;
+            color: #666;
+            padding: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .rooms-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .room-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
     </style>
 </head>
 <body>
@@ -310,6 +460,7 @@
                 <input type="text" id="usernameInput" placeholder="Your username" />
                 <input type="text" id="roomInput" placeholder="Room ID (default: 'default')" value="default" />
                 <button id="joinBtn">Join Room</button>
+                <button id="newRoomBtn">New Room</button>
                 <button id="leaveBtn" disabled>Leave Room</button>
             </div>
             <div class="input-group">
@@ -335,6 +486,18 @@
                         <audio id="localAudio" muted></audio>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Available Rooms Section -->
+        <div class="available-rooms">
+            <h3>🏠 Available Rooms</h3>
+            <div class="room-controls">
+                <button id="refreshRoomsBtn" class="refresh-btn">🔄 Refresh</button>
+                <span class="room-count">Loading rooms...</span>
+            </div>
+            <div id="availableRoomsList" class="rooms-grid">
+                Loading available rooms...
             </div>
         </div>
 

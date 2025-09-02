@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local STUN Server Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border-color: #17a2b8;
+            color: #0c5460;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 Local PHP STUN Server Test</h1>
+        <p>This page tests the local PHP STUN server implementation replacing external Google STUN servers.</p>
+        
+        <div id="results"></div>
+        
+        <button onclick="runTests()">🧪 Run All Tests</button>
+        <button onclick="testWebRTC()">🎙️ Test WebRTC with Local STUN</button>
+        <button onclick="window.location.href='index.html'">🎥 Go to Audio Conference</button>
+        <button onclick="window.location.href='connection_test.html'">🔧 Connection Test</button>
+    </div>
+
+    <script>
+        async function runTests() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">🔄 Running STUN server tests...</div>';
+            
+            const tests = [];
+            
+            // Test 1: STUN Configuration
+            try {
+                const configResponse = await fetch('stun_config.php?action=config');
+                const config = await configResponse.json();
+                
+                if (config.success) {
+                    tests.push({
+                        name: 'STUN Configuration',
+                        status: 'success',
+                        details: `✅ Configuration loaded successfully. Found ${config.stun_servers.length} STUN endpoints.`,
+                        data: config
+                    });
+                } else {
+                    tests.push({
+                        name: 'STUN Configuration',
+                        status: 'error',
+                        details: '❌ Configuration failed to load'
+                    });
+                }
+            } catch (error) {
+                tests.push({
+                    name: 'STUN Configuration',
+                    status: 'error',
+                    details: `❌ Error: ${error.message}`
+                });
+            }
+            
+            // Test 2: STUN Binding
+            try {
+                const bindingResponse = await fetch('stun_server.php?action=binding');
+                const binding = await bindingResponse.json();
+                
+                if (binding.success) {
+                    tests.push({
+                        name: 'STUN Binding',
+                        status: 'success',
+                        details: `✅ Binding successful. Mapped IP: ${binding.mapped_address.ip}:${binding.mapped_address.port}`,
+                        data: binding
+                    });
+                } else {
+                    tests.push({
+                        name: 'STUN Binding',
+                        status: 'error',
+                        details: '❌ Binding failed'
+                    });
+                }
+            } catch (error) {
+                tests.push({
+                    name: 'STUN Binding',
+                    status: 'error',
+                    details: `❌ Error: ${error.message}`
+                });
+            }
+            
+            // Test 3: STUN Discovery
+            try {
+                const discoveryResponse = await fetch('stun_server.php?action=discover');
+                const discovery = await discoveryResponse.json();
+                
+                if (discovery.success) {
+                    tests.push({
+                        name: 'STUN Discovery',
+                        status: 'success',
+                        details: `✅ Discovery successful. NAT Type: ${discovery.network_info.nat_type}`,
+                        data: discovery
+                    });
+                } else {
+                    tests.push({
+                        name: 'STUN Discovery',
+                        status: 'error',
+                        details: '❌ Discovery failed'
+                    });
+                }
+            } catch (error) {
+                tests.push({
+                    name: 'STUN Discovery',
+                    status: 'error',
+                    details: `❌ Error: ${error.message}`
+                });
+            }
+            
+            // Test 4: ICE Candidates
+            try {
+                const candidatesResponse = await fetch('stun_server.php?action=candidates');
+                const candidates = await candidatesResponse.json();
+                
+                if (candidates.success) {
+                    tests.push({
+                        name: 'ICE Candidates',
+                        status: 'success',
+                        details: `✅ Candidates generated. Found ${candidates.candidates.length} candidates.`,
+                        data: candidates
+                    });
+                } else {
+                    tests.push({
+                        name: 'ICE Candidates',
+                        status: 'error',
+                        details: '❌ Candidates generation failed'
+                    });
+                }
+            } catch (error) {
+                tests.push({
+                    name: 'ICE Candidates',
+                    status: 'error',
+                    details: `❌ Error: ${error.message}`
+                });
+            }
+            
+            // Display results
+            displayResults(tests);
+        }
+        
+        async function testWebRTC() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="info">🔄 Testing WebRTC with local STUN server...</div>';
+            
+            try {
+                // Get local STUN configuration
+                const configResponse = await fetch('stun_config.php?action=config');
+                const config = await configResponse.json();
+                
+                if (!config.success) {
+                    throw new Error('Could not load STUN configuration');
+                }
+                
+                // Create WebRTC connection with local STUN
+                const localStunUrl = `stun:${window.location.hostname}:${window.location.port || 80}`;
+                const rtcConfig = {
+                    iceServers: [
+                        { urls: localStunUrl },
+                        { urls: 'stun:stun.l.google.com:19302' } // fallback
+                    ]
+                };
+                
+                const pc = new RTCPeerConnection(rtcConfig);
+                
+                // Test ICE candidate generation
+                const candidates = [];
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        candidates.push(event.candidate);
+                        console.log('ICE Candidate:', event.candidate.candidate);
+                    }
+                };
+                
+                // Create offer to trigger ICE gathering
+                pc.createDataChannel('test');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                // Wait for ICE candidates
+                setTimeout(() => {
+                    pc.close();
+                    
+                    const results = [{
+                        name: 'WebRTC Local STUN Test',
+                        status: candidates.length > 0 ? 'success' : 'error',
+                        details: candidates.length > 0 
+                            ? `✅ WebRTC working with local STUN. Generated ${candidates.length} ICE candidates.`
+                            : '❌ No ICE candidates generated',
+                        data: {
+                            config: rtcConfig,
+                            candidates: candidates.map(c => c.candidate)
+                        }
+                    }];
+                    
+                    displayResults(results);
+                }, 3000);
+                
+            } catch (error) {
+                displayResults([{
+                    name: 'WebRTC Local STUN Test',
+                    status: 'error',
+                    details: `❌ Error: ${error.message}`
+                }]);
+            }
+        }
+        
+        function displayResults(tests) {
+            const resultsDiv = document.getElementById('results');
+            let html = '<h2>📊 Test Results</h2>';
+            
+            tests.forEach(test => {
+                html += `
+                    <div class="test-result ${test.status}">
+                        <h3>${test.name}</h3>
+                        <p>${test.details}</p>
+                        ${test.data ? `<details><summary>Show Data</summary><pre>${JSON.stringify(test.data, null, 2)}</pre></details>` : ''}
+                    </div>
+                `;
+            });
+            
+            // Summary
+            const successCount = tests.filter(t => t.status === 'success').length;
+            const totalCount = tests.length;
+            
+            html += `
+                <div class="test-result ${successCount === totalCount ? 'success' : 'info'}">
+                    <h3>📈 Summary</h3>
+                    <p><strong>${successCount}/${totalCount}</strong> tests passed</p>
+                    <p>${successCount === totalCount ? '🎉 All tests successful! Local STUN server is working correctly.' : '⚠️ Some tests failed. Check configuration and try again.'}</p>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            setTimeout(runTests, 1000);
+        });
+    </script>
+</body>
+</html>

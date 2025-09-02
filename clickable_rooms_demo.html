@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clickable Rooms Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .demo-section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.success {
+            background: #28a745;
+        }
+        button.success:hover {
+            background: #218838;
+        }
+        .room-demo {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .room-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .room-card:hover {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea20, #764ba220);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .room-id {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #333;
+        }
+        .room-name {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .room-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: #888;
+        }
+        .room-participants {
+            background: #667eea;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        .feature-list li::before {
+            content: "✅ ";
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 Clickable Rooms Demo</h1>
+        <p>This page demonstrates the new clickable room interface where users can see and directly join rooms without manually entering room IDs.</p>
+
+        <div class="demo-section">
+            <h2>📋 New Features Implemented</h2>
+            <ul class="feature-list">
+                <li>Visual room cards displaying available rooms</li>
+                <li>Real-time participant count display (0/4, 1/4, etc.)</li>
+                <li>Click-to-join functionality - no manual ID entry needed</li>
+                <li>Room status indicators (full rooms are disabled)</li>
+                <li>Automatic room list refresh when joining/leaving</li>
+                <li>3-digit + timestamp room ID system for uniqueness</li>
+                <li>Current room highlighting</li>
+            </ul>
+        </div>
+
+        <div class="demo-section">
+            <h2>🎯 How to Use</h2>
+            <ol>
+                <li><strong>View Available Rooms:</strong> See all available rooms displayed as cards</li>
+                <li><strong>Check Capacity:</strong> Each room shows current participants (e.g., "2/4")</li>
+                <li><strong>Click to Join:</strong> Simply click on any room card to join that room</li>
+                <li><strong>Automatic Username:</strong> If no username is set, one is generated automatically</li>
+                <li><strong>Room Switching:</strong> Confirm dialog when switching between rooms</li>
+                <li><strong>Create New Rooms:</strong> Use "New Room" button to create rooms with unique IDs</li>
+            </ol>
+        </div>
+
+        <div class="demo-section">
+            <h2>🎨 Room Card Example</h2>
+            <p>Here's how room cards look and behave:</p>
+            <div class="room-demo">
+                <div class="room-card" onclick="alert('This would join Room #123!')">
+                    <div class="room-id">#123</div>
+                    <div class="room-name">Conference Room A</div>
+                    <div class="room-info">
+                        <small>Created: Today, 2:30 PM</small>
+                        <span class="room-participants">2/4</span>
+                    </div>
+                </div>
+                <div class="room-card" style="opacity: 0.7; cursor: not-allowed;" onclick="alert('Room is full!')">
+                    <div class="room-id">#456</div>
+                    <div class="room-name">Meeting Room B</div>
+                    <div class="room-info">
+                        <small>Created: Today, 1:15 PM</small>
+                        <span class="room-participants" style="background: #dc3545;">4/4</span>
+                    </div>
+                    <div style="font-size: 0.8rem; color: #dc3545; margin-top: 0.5rem;">Room Full</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🚀 Try the Live Implementation</h2>
+            <p>Ready to test the actual clickable room interface?</p>
+            <button class="success" onclick="window.location.href='public/index.html'">
+                🎙️ Open Audio Conference with Clickable Rooms
+            </button>
+            <button onclick="window.location.href='room_test.html'">
+                🧪 Room Creation Test Page
+            </button>
+        </div>
+
+        <div class="demo-section">
+            <h2>📊 Current System Status</h2>
+            <p>Check the current rooms in the database:</p>
+            <button onclick="loadCurrentRooms()">🔄 Load Current Rooms</button>
+            <div id="currentRooms" style="margin-top: 1rem;">
+                Click "Load Current Rooms" to see the current database state.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadCurrentRooms() {
+            const container = document.getElementById('currentRooms');
+            container.innerHTML = '🔄 Loading...';
+            
+            try {
+                const response = await fetch('public/api.php?action=list_rooms');
+                const result = await response.json();
+                
+                if (result.success && result.data.rooms) {
+                    const rooms = result.data.rooms;
+                    
+                    if (rooms.length === 0) {
+                        container.innerHTML = '<p>📭 No rooms found in database.</p>';
+                        return;
+                    }
+                    
+                    let html = `<h4>📋 Found ${rooms.length} room(s):</h4><div class="room-demo">`;
+                    
+                    for (const room of rooms) {
+                        // Get participant count
+                        try {
+                            const peersResponse = await fetch(`public/api.php?action=peers&roomId=${room.room_id}`);
+                            const peersResult = await peersResponse.json();
+                            const participantCount = peersResult.success ? peersResult.data.peers.length : 0;
+                            
+                            const displayId = room.room_id.split('_')[0];
+                            const isFull = participantCount >= 4;
+                            
+                            html += `
+                                <div class="room-card ${isFull ? 'full' : ''}" style="${isFull ? 'opacity: 0.7; cursor: not-allowed;' : ''}">
+                                    <div class="room-id">#${displayId}</div>
+                                    <div class="room-name">${room.name}</div>
+                                    <div class="room-info">
+                                        <small>Created: ${room.created_at}</small>
+                                        <span class="room-participants" style="${isFull ? 'background: #dc3545;' : ''}">${participantCount}/4</span>
+                                    </div>
+                                    ${isFull ? '<div style="font-size: 0.8rem; color: #dc3545; margin-top: 0.5rem;">Room Full</div>' : ''}
+                                </div>
+                            `;
+                        } catch (error) {
+                            html += `
+                                <div class="room-card">
+                                    <div class="room-id">#${room.room_id.split('_')[0]}</div>
+                                    <div class="room-name">${room.name}</div>
+                                    <div class="room-info">
+                                        <small>Created: ${room.created_at}</small>
+                                        <span class="room-participants">?/4</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<p>❌ Failed to load rooms: ' + (result.error || 'Unknown error') + '</p>';
+                }
+            } catch (error) {
+                container.innerHTML = '<p>❌ Connection error: ' + error.message + '</p>';
+            }
+        }
+    </script>
+</body>
+</html>

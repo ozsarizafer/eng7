@@ -47,6 +47,15 @@ class SignalController {
                 case 'peers':
                     $this->handleGetPeers();
                     break;
+                case 'cleanup':
+                    $this->handleCleanup();
+                    break;
+                case 'create_room':
+                    $this->handleCreateRoom();
+                    break;
+                case 'list_rooms':
+                    $this->handleListRooms();
+                    break;
                 default:
                     $this->sendError('Invalid action', 400);
             }
@@ -67,8 +76,18 @@ class SignalController {
             return;
         }
 
-        // Check room capacity (max 4 peers)
+        // Clean up inactive peers before checking capacity (peers inactive for more than 5 minutes)
+        $this->signal->cleanupInactivePeers(5);
+        
+        // Also clean up old signaling messages
+        $this->signal->cleanupOldMessages(1); // Clean messages older than 1 hour
+        
+        // Remove any existing entry for this peer (rejoin scenario)
+        $this->signal->leavePeer($peerId);
+
+        // Check room capacity (max 4 peers) after cleanup
         $currentPeers = $this->signal->getRoomPeers($roomId);
+        
         if (count($currentPeers) >= 4) {
             $this->sendError('Room is full. Maximum 4 participants allowed.', 403);
             return;
@@ -192,10 +211,18 @@ class SignalController {
 
         // Keep connection alive and send events
         $lastEventId = $_SERVER['HTTP_LAST_EVENT_ID'] ?? 0;
+        $cleanupCounter = 0; // Counter to periodically run cleanup
         
         while (true) {
             // Update last seen
             $this->signal->updatePeerLastSeen($peerId);
+            
+            // Periodically cleanup inactive peers (every 30 seconds)
+            $cleanupCounter++;
+            if ($cleanupCounter >= 30) {
+                $this->signal->cleanupInactivePeers(5); // Clean peers inactive for 5+ minutes
+                $cleanupCounter = 0;
+            }
 
             // Get new messages
             $messages = $this->signal->getUnprocessedMessages($peerId);
@@ -231,6 +258,61 @@ class SignalController {
         $peers = $this->signal->getRoomPeers($roomId);
         
         $this->sendSuccess(['peers' => $peers]);
+    }
+    
+    private function handleCleanup() {
+        // Clean up inactive peers (older than 1 minute for immediate cleanup)
+        $inactiveCount = $this->signal->cleanupInactivePeers(1);
+        
+        // Clean up old messages (older than 1 hour)
+        $messageCount = $this->signal->cleanupOldMessages(1);
+        
+        $this->sendSuccess([
+            'message' => 'Cleanup completed',
+            'inactive_peers_removed' => $inactiveCount,
+            'old_messages_removed' => $messageCount
+        ]);
+    }
+    
+    private function handleCreateRoom() {
+        $input = $this->getJsonInput();
+        $roomName = $input['roomName'] ?? '';
+        
+        // Generate unique room ID with 3-digit format + timestamp
+        $roomId = $this->signal->generateUniqueRoomId();
+        
+        // Create room name based on input or default format
+        if (empty($roomName)) {
+            $roomName = 'Room ' . explode('_', $roomId)[0]; // Use just the 3-digit part for display
+        }
+        
+        try {
+            // Create the room in database
+            $this->signal->createRoom($roomId, $roomName);
+            
+            $this->sendSuccess([
+                'message' => 'Room created successfully',
+                'roomId' => $roomId,
+                'roomName' => $roomName,
+                'timestamp' => time()
+            ]);
+        } catch (Exception $e) {
+            $this->sendError('Failed to create room: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleListRooms() {
+        try {
+            $rooms = $this->signal->getAllRooms();
+            
+            $this->sendSuccess([
+                'message' => 'Rooms retrieved successfully',
+                'rooms' => $rooms,
+                'count' => count($rooms)
+            ]);
+        } catch (Exception $e) {
+            $this->sendError('Failed to retrieve rooms: ' . $e->getMessage(), 500);
+        }
     }
 
     private function getJsonInput() {

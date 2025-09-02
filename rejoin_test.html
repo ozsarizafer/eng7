@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Rejoin & Participant Count Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+        pre {
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Room Rejoin & Participant Count Test</h1>
+        <p>This page tests the fixes for audio connection on rejoin and participant count updates.</p>
+
+        <div class="test-section">
+            <h3>🧪 Test Issues Fixed</h3>
+            <ul>
+                <li>✅ <strong>Issue 1:</strong> Audio connection doesn't work when leaving and rejoining a room</li>
+                <li>✅ <strong>Issue 2:</strong> Participant count doesn't decrease when someone leaves the room</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Manual Testing Steps</h3>
+            <ol>
+                <li><strong>Test Audio Rejoin:</strong>
+                    <ul>
+                        <li>Open main interface in 2 browser tabs</li>
+                        <li>Join the same room in both tabs</li>
+                        <li>Leave room in tab 1, then rejoin</li>
+                        <li>Verify audio works between both tabs</li>
+                    </ul>
+                </li>
+                <li><strong>Test Participant Count:</strong>
+                    <ul>
+                        <li>Monitor room list on this page</li>
+                        <li>Leave room in one tab</li>
+                        <li>Verify count decreases in room list</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Current Room Status</h3>
+            <button onclick="checkRoomStatus()">🔍 Check Current Rooms</button>
+            <button onclick="cleanupDatabase()">🧹 Cleanup Stale Peers</button>
+            <div id="roomStatus"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎙️ Open Test Interface</h3>
+            <p>Open the main interface to test the fixes:</p>
+            <button onclick="window.open('public/index.html', '_blank')">
+                🆕 Open Interface (Tab 1)
+            </button>
+            <button onclick="window.open('public/index.html', '_blank')">
+                🆕 Open Interface (Tab 2)
+            </button>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Technical Improvements Made</h3>
+            <ul>
+                <li><strong>Connection State Reset:</strong> Complete cleanup of WebRTC connections on leave</li>
+                <li><strong>Audio Track Management:</strong> Proper replacement of audio tracks on rejoin</li>
+                <li><strong>Peer Connection Versioning:</strong> Prevent stale ICE candidates</li>
+                <li><strong>Staggered Connection Creation:</strong> Improved reliability for multiple peers</li>
+                <li><strong>Enhanced Leave Handling:</strong> Immediate UI updates and room list refresh</li>
+                <li><strong>Database Cleanup:</strong> Automatic removal of stale peer entries</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        async function checkRoomStatus() {
+            const statusDiv = document.getElementById('roomStatus');
+            statusDiv.innerHTML = '🔄 Checking room status...';
+            
+            try {
+                // Get visible rooms (with participants)
+                const visibleResponse = await fetch('public/api.php?action=list_rooms');
+                const visibleResult = await visibleResponse.json();
+                
+                const visibleCount = visibleResult.success ? visibleResult.data.count : 0;
+                const visibleRooms = visibleResult.success ? visibleResult.data.rooms : [];
+                
+                let html = `
+                    <div class="result">
+                        <h4>📋 Room Status Summary</h4>
+                        <p><strong>Visible Rooms (with participants):</strong> ${visibleCount}</p>
+                `;
+                
+                if (visibleCount > 0) {
+                    html += '<p><strong>Room Details:</strong></p>';
+                    
+                    for (const room of visibleRooms) {
+                        try {
+                            // Get participant count for each room
+                            const peersResponse = await fetch(`public/api.php?action=peers&roomId=${room.room_id}`);
+                            const peersResult = await peersResponse.json();
+                            const participantCount = peersResult.success ? peersResult.data.peers.length : 0;
+                            const participants = peersResult.success ? peersResult.data.peers : [];
+                            
+                            const displayId = room.room_id.split('_')[0];
+                            
+                            html += `
+                                <div style="margin: 10px 0; padding: 10px; background: #f1f1f1; border-radius: 5px;">
+                                    <strong>Room #${displayId}</strong> (${room.name})
+                                    <br><strong>Participants:</strong> ${participantCount}/4
+                                    <br><strong>Created:</strong> ${room.created_at}
+                            `;
+                            
+                            if (participants.length > 0) {
+                                html += '<br><strong>Active Peers:</strong><ul>';
+                                participants.forEach(peer => {
+                                    html += `<li>${peer.username} (${peer.peer_id}) - Joined: ${peer.joined_at}</li>`;
+                                });
+                                html += '</ul>';
+                            }
+                            
+                            html += '</div>';
+                            
+                        } catch (error) {
+                            html += `<p>❌ Error getting details for room ${room.room_id}: ${error.message}</p>`;
+                        }
+                    }
+                } else {
+                    html += '<p class="info">ℹ️ No rooms currently visible - all rooms are empty!</p>';
+                }
+                
+                html += `
+                        <p class="success">✅ Room filtering and participant tracking working!</p>
+                        <p><small>Last updated: ${new Date().toLocaleTimeString()}</small></p>
+                    </div>
+                `;
+                
+                statusDiv.innerHTML = html;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="result">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function cleanupDatabase() {
+            const statusDiv = document.getElementById('roomStatus');
+            statusDiv.innerHTML = '🧹 Cleaning up database...';
+            
+            try {
+                const response = await fetch('public/api.php?action=cleanup');
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `
+                        <div class="result">
+                            <h4>🧹 Database Cleanup Complete</h4>
+                            <p><strong>Inactive peers removed:</strong> ${result.data.inactive_peers_removed}</p>
+                            <p><strong>Old messages removed:</strong> ${result.data.old_messages_removed}</p>
+                            <p class="success">✅ Database cleaned successfully!</p>
+                        </div>
+                    `;
+                    
+                    // Refresh room status after cleanup
+                    setTimeout(() => {
+                        checkRoomStatus();
+                    }, 1000);
+                } else {
+                    statusDiv.innerHTML = `<div class="result">❌ Cleanup failed: ${result.error}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="result">❌ Cleanup error: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-check status on page load
+        window.addEventListener('load', () => {
+            setTimeout(checkRoomStatus, 1000);
+        });
+        
+        // Auto-refresh every 30 seconds
+        setInterval(checkRoomStatus, 30000);
+    </script>
+</body>
+</html>

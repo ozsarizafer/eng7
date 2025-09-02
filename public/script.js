@@ -10,20 +10,23 @@ class AudioConferenceClient {
         this.isConnected = false;
         this.isMuted = false;
         this.existingPeers = [];
+        this.connectionVersion = 0; // Track connection version for ICE candidate validation
         
         // Get the current host and port for API calls
         this.apiBase = this.getApiBase();
         
-        // WebRTC configuration with STUN servers for NAT traversal
+        // WebRTC configuration with local PHP STUN server
         this.rtcConfig = {
             iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' },
-                { urls: 'stun:stun3.l.google.com:19302' },
-                { urls: 'stun:stun4.l.google.com:19302' }
+                // Primary: Local PHP STUN server
+                { urls: `stun:${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? 443 : 80)}` },
+                // Fallback: One external STUN server for redundancy
+                { urls: 'stun:stun.l.google.com:19302' }
             ]
         };
+        
+        // Initialize local STUN server configuration
+        this.initializeLocalStun();
 
         this.initializeElements();
         this.bindEvents();
@@ -38,6 +41,7 @@ class AudioConferenceClient {
         
         // Button elements
         this.joinBtn = document.getElementById('joinBtn');
+        this.newRoomBtn = document.getElementById('newRoomBtn');
         this.leaveBtn = document.getElementById('leaveBtn');
         this.muteBtn = document.getElementById('muteBtn');
         this.unmuteBtn = document.getElementById('unmuteBtn');
@@ -55,6 +59,11 @@ class AudioConferenceClient {
         this.messageContainer = document.getElementById('messageContainer');
         this.roomCapacity = document.getElementById('roomCapacity');
         this.currentRoom = document.getElementById('currentRoom');
+        
+        // Available rooms elements
+        this.refreshRoomsBtn = document.getElementById('refreshRoomsBtn');
+        this.availableRoomsList = document.getElementById('availableRoomsList');
+        this.roomCount = document.querySelector('.room-count');
 
         // Set peer ID display
         this.peerIdDisplay.textContent = this.peerId;
@@ -62,18 +71,57 @@ class AudioConferenceClient {
 
     bindEvents() {
         this.joinBtn.addEventListener('click', () => this.joinRoom());
+        this.newRoomBtn.addEventListener('click', () => this.createNewRoom());
         this.leaveBtn.addEventListener('click', () => this.leaveRoom());
         this.muteBtn.addEventListener('click', () => this.muteAudio());
         this.unmuteBtn.addEventListener('click', () => this.unmuteAudio());
+        this.refreshRoomsBtn.addEventListener('click', () => this.loadAvailableRooms());
 
         // Handle page unload
         window.addEventListener('beforeunload', () => {
             this.leaveRoom();
         });
+        
+        // Load available rooms on page load
+        this.loadAvailableRooms();
     }
 
     generatePeerId() {
         return 'peer_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    }
+
+    async initializeLocalStun() {
+        try {
+            // Test local STUN server configuration
+            const stunConfigUrl = this.apiBase + 'stun_config.php?action=config';
+            const response = await fetch(stunConfigUrl);
+            
+            if (response.ok) {
+                const config = await response.json();
+                
+                if (config.success && config.webrtc_config) {
+                    // Update RTCConfiguration with local STUN server
+                    this.rtcConfig = {
+                        iceServers: [
+                            // Local STUN server
+                            ...config.webrtc_config.iceServers,
+                            // Keep one external fallback
+                            { urls: 'stun:stun.l.google.com:19302' }
+                        ]
+                    };
+                    
+                    console.log('🏠 Local STUN server configured:', config.server_info.stun_endpoint);
+                    console.log('🔗 WebRTC Config:', this.rtcConfig);
+                } else {
+                    console.warn('⚠️ Local STUN server config failed, using fallback');
+                }
+            } else {
+                console.warn('⚠️ Could not reach local STUN server, using fallback');
+            }
+        } catch (error) {
+            console.warn('⚠️ Local STUN server initialization failed:', error.message);
+            console.log('📡 Using fallback STUN configuration');
+        }
     }
 
     getApiBase() {
@@ -146,8 +194,9 @@ class AudioConferenceClient {
 
     async getLocalIpHint() {
         try {
-            // Try to get a hint about local IP using WebRTC
-            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            // Try to get a hint about local IP using local STUN server
+            const localStunUrl = `stun:${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? 443 : 80)}`;
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: localStunUrl }] });
             pc.createDataChannel('');
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
@@ -177,6 +226,7 @@ class AudioConferenceClient {
                         
                         console.log(`🔍 Detected local IP: ${localIp}`);
                         console.log(`📲 Suggested URL for other devices: ${suggestedUrl}`);
+                        console.log(`🏠 Using local STUN server: ${localStunUrl}`);
                         
                         // Display this info in the UI
                         this.showNetworkInfo(localIp, suggestedUrl);
@@ -191,7 +241,29 @@ class AudioConferenceClient {
             setTimeout(() => pc.close(), 3000);
             
         } catch (error) {
-            console.log('Could not detect local IP automatically');
+            console.log('Could not detect local IP automatically, trying fallback STUN...');
+            // Fallback to external STUN if local fails
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+                pc.createDataChannel('');
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        const candidate = event.candidate.candidate;
+                        const ipMatch = candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
+                        if (ipMatch && !ipMatch[1].startsWith('127.') && !ipMatch[1].startsWith('169.254.')) {
+                            console.log(`🔍 Detected local IP (fallback): ${ipMatch[1]}`);
+                            pc.close();
+                        }
+                    }
+                };
+                
+                setTimeout(() => pc.close(), 3000);
+            } catch (fallbackError) {
+                console.log('IP detection failed completely');
+            }
         }
     }
 
@@ -221,6 +293,13 @@ class AudioConferenceClient {
         this.roomId = this.roomInput.value.trim() || 'default';
 
         try {
+            // Ensure clean state before joining
+            if (this.isConnected) {
+                await this.leaveRoom();
+                // Wait a bit for cleanup to complete
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
             const response = await fetch(this.apiBase + 'api.php?action=join', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -239,18 +318,30 @@ class AudioConferenceClient {
                 this.updateStatus('connected', 'Connected to room: ' + this.roomId);
                 this.currentRoom.textContent = this.roomId;
                 this.updateLocalParticipant();
+                
+                // Start signaling before audio to ensure we can receive offers
                 this.startSignaling();
                 this.loadPeers();
                 
-                // Auto-start audio when joining
+                // Start audio and wait for it to be ready
                 await this.startAudio();
                 
-                // Create connections to existing peers
-                for (const peer of this.existingPeers) {
+                // Create connections to existing peers with staggered timing
+                for (let i = 0; i < this.existingPeers.length; i++) {
+                    const peer = this.existingPeers[i];
+                    console.log(`🔗 Creating connection to existing peer: ${peer.peer_id}`);
                     await this.createOfferToPeer(peer.peer_id);
+                    
+                    // Staggered connection creation for reliability
+                    if (i < this.existingPeers.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
                 }
                 
                 this.showMessage('Successfully joined audio conference!', 'success');
+                
+                // Refresh room list to update participant counts
+                setTimeout(() => this.loadAvailableRooms(), 1000);
             } else {
                 this.showMessage('Failed to join room: ' + result.error, 'error');
             }
@@ -266,21 +357,8 @@ class AudioConferenceClient {
         if (!this.isConnected) return;
 
         try {
-            // Stop media streams
-            this.stopAllMedia();
-
-            // Close all peer connections
-            this.peerConnections.forEach((pc, peerId) => {
-                pc.close();
-            });
-            this.peerConnections.clear();
-            this.remoteStreams.clear();
-
-            // Stop signaling
-            if (this.eventSource) {
-                this.eventSource.close();
-                this.eventSource = null;
-            }
+            // Complete connection state reset
+            this.resetConnectionState();
 
             // Notify server
             await fetch(this.apiBase + 'api.php?action=leave', {
@@ -299,11 +377,84 @@ class AudioConferenceClient {
             this.clearRemoteParticipants();
             this.showMessage('Left the conference', 'success');
             
+            // Refresh room list to update participant counts
+            setTimeout(() => this.loadAvailableRooms(), 500);
+            
         } catch (error) {
             console.error('Leave room error:', error);
         }
 
         this.updateUI();
+    }
+
+    resetConnectionState() {
+        console.log('🔄 Resetting connection state for clean rejoin');
+        
+        // Increment connection version to invalidate stale ICE candidates
+        this.connectionVersion++;
+        
+        // Stop and close all media streams
+        this.stopAllMedia();
+
+        // Close all peer connections properly
+        this.peerConnections.forEach((pc, peerId) => {
+            console.log(`Closing connection to peer: ${peerId}`);
+            if (pc.connectionState !== 'closed') {
+                pc.close();
+            }
+        });
+        this.peerConnections.clear();
+        this.remoteStreams.clear();
+
+        // Stop signaling
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
+        }
+        
+        // Clear peer list
+        this.existingPeers = [];
+        
+        console.log('✅ Connection state reset complete');
+    }
+
+    async createNewRoom() {
+        if (this.isConnected) {
+            this.showMessage('Please leave current room before creating a new one', 'error');
+            return;
+        }
+
+        try {
+            // Create new room with 3-digit + timestamp format
+            const response = await fetch(this.apiBase + 'api.php?action=create_room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomName: '' // Let server generate default name
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                // Set the new room ID in the input field
+                this.roomInput.value = result.data.roomId;
+                this.roomId = result.data.roomId;
+                
+                this.showMessage(`New room created: ${result.data.roomName} (ID: ${result.data.roomId})`, 'success');
+                
+                // According to specification: automatically join the generated room
+                await this.joinRoom();
+                
+                // Refresh room list to show the new room
+                setTimeout(() => this.loadAvailableRooms(), 1000);
+            } else {
+                this.showMessage('Failed to create room: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Create room error:', error);
+            this.showMessage('Connection error: ' + error.message, 'error');
+        }
     }
 
     startSignaling() {
@@ -365,7 +516,6 @@ class AudioConferenceClient {
 
     handlePeerLeft(data) {
         this.showMessage(`Peer left the conference`, 'success');
-        this.loadPeers();
         
         // Close connection to departed peer
         if (this.peerConnections.has(data.peerId)) {
@@ -378,7 +528,12 @@ class AudioConferenceClient {
             this.remoteStreams.delete(data.peerId);
         }
         
+        // Update UI immediately
         this.updateRemoteParticipants();
+        this.loadPeers(); // Refresh peer count
+        
+        // Refresh room list to update participant counts for other rooms too
+        setTimeout(() => this.loadAvailableRooms(), 500);
     }
 
     async handleOffer(message) {
@@ -411,32 +566,81 @@ class AudioConferenceClient {
         
         const peerConnection = this.peerConnections.get(message.from);
         if (peerConnection && message.data.candidate) {
-            const candidate = new RTCIceCandidate(message.data);
-            await peerConnection.addIceCandidate(candidate);
+            // Validate connection state before processing candidate
+            if (peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') {
+                console.log(`⚠️ Ignoring ICE candidate for ${message.from} - connection state: ${peerConnection.connectionState}`);
+                return;
+            }
+            
+            try {
+                const candidate = new RTCIceCandidate(message.data);
+                await peerConnection.addIceCandidate(candidate);
+                console.log(`✅ Added ICE candidate for ${message.from}`);
+            } catch (error) {
+                console.warn(`⚠️ Failed to add ICE candidate for ${message.from}:`, error.message);
+            }
+        } else {
+            console.log(`⚠️ No valid peer connection found for ${message.from} or no candidate data`);
         }
     }
 
     async createPeerConnection(peerId) {
+        // Check if we already have a valid connection
+        const existingConnection = this.peerConnections.get(peerId);
+        if (existingConnection && 
+            (existingConnection.connectionState === 'connected' || 
+             existingConnection.connectionState === 'connecting')) {
+            console.log(`🔄 Reusing existing connection to ${peerId} (state: ${existingConnection.connectionState})`);
+            return existingConnection;
+        }
+        
+        // Close any existing connection that's in a bad state
+        if (existingConnection) {
+            console.log(`🗑️ Closing stale connection to ${peerId} (state: ${existingConnection.connectionState})`);
+            existingConnection.close();
+        }
+        
+        console.log(`🆕 Creating new peer connection to ${peerId}`);
         const peerConnection = new RTCPeerConnection(this.rtcConfig);
         this.peerConnections.set(peerId, peerConnection);
+        
+        // Store connection version for validation
+        peerConnection.connectionVersion = this.connectionVersion;
 
         // Handle ICE candidates
         peerConnection.onicecandidate = async (event) => {
-            if (event.candidate) {
+            if (event.candidate && peerConnection.connectionVersion === this.connectionVersion) {
+                console.log(`🧊 Sending ICE candidate to ${peerId}`);
                 await this.sendSignal(peerId, 'ice-candidate', event.candidate);
+            } else if (event.candidate) {
+                console.log(`⚠️ Ignoring stale ICE candidate for ${peerId} (version mismatch)`);
             }
         };
 
         // Handle remote stream
         peerConnection.ontrack = (event) => {
-            console.log('Received remote stream from:', peerId);
+            console.log('🎵 Received remote stream from:', peerId);
             const remoteStream = event.streams[0];
             this.remoteStreams.set(peerId, remoteStream);
             this.updateRemoteParticipants();
         };
+        
+        // Monitor connection state
+        peerConnection.onconnectionstatechange = () => {
+            console.log(`🔗 Connection to ${peerId} state: ${peerConnection.connectionState}`);
+            
+            if (peerConnection.connectionState === 'failed') {
+                console.log(`❌ Connection to ${peerId} failed, attempting reconnection`);
+                // Remove failed connection and let it be recreated on next offer
+                this.peerConnections.delete(peerId);
+                this.remoteStreams.delete(peerId);
+                this.updateRemoteParticipants();
+            }
+        };
 
         // Add local stream if available
         if (this.localStream) {
+            console.log(`🎵 Adding local audio tracks to connection with ${peerId}`);
             this.localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, this.localStream);
             });
@@ -485,6 +689,12 @@ class AudioConferenceClient {
 
     async startAudio() {
         try {
+            // Stop any existing audio first
+            if (this.localStream) {
+                this.localStream.getTracks().forEach(track => track.stop());
+            }
+            
+            console.log('🎵 Starting audio capture...');
             this.localStream = await navigator.mediaDevices.getUserMedia({ 
                 audio: {
                     echoCancellation: true,
@@ -494,8 +704,19 @@ class AudioConferenceClient {
             });
             this.localAudio.srcObject = this.localStream;
             
-            // Add audio track to all existing peer connections
+            // Replace audio tracks in all existing peer connections
             this.peerConnections.forEach((pc, peerId) => {
+                console.log(`🔄 Updating audio tracks for peer: ${peerId}`);
+                
+                // Remove existing audio tracks
+                const senders = pc.getSenders();
+                senders.forEach(sender => {
+                    if (sender.track && sender.track.kind === 'audio') {
+                        pc.removeTrack(sender);
+                    }
+                });
+                
+                // Add new audio tracks
                 this.localStream.getTracks().forEach(track => {
                     pc.addTrack(track, this.localStream);
                 });
@@ -503,6 +724,7 @@ class AudioConferenceClient {
             
             this.updateLocalParticipant();
             this.showMessage('Audio started - you can now speak', 'success');
+            console.log('✅ Audio capture started successfully');
         } catch (error) {
             console.error('Error accessing microphone:', error);
             this.showMessage('Failed to access microphone: ' + error.message, 'error');
@@ -657,6 +879,7 @@ class AudioConferenceClient {
 
         // Enable/disable buttons based on connection state
         this.joinBtn.disabled = this.isConnected;
+        this.newRoomBtn.disabled = this.isConnected;
         this.leaveBtn.disabled = !this.isConnected;
         this.muteBtn.disabled = !hasAudio || this.isMuted;
         this.unmuteBtn.disabled = !hasAudio || !this.isMuted;
@@ -679,6 +902,145 @@ class AudioConferenceClient {
                 messageDiv.parentNode.removeChild(messageDiv);
             }
         }, 5000);
+    }
+
+    async loadAvailableRooms() {
+        try {
+            this.availableRoomsList.innerHTML = '<div class="loading-rooms">🔄 Loading available rooms...</div>';
+            this.roomCount.textContent = 'Loading...';
+
+            const response = await fetch(this.apiBase + 'api.php?action=list_rooms');
+            const result = await response.json();
+
+            if (result.success) {
+                this.displayAvailableRooms(result.data.rooms);
+                this.roomCount.textContent = `${result.data.count} room(s) available`;
+            } else {
+                this.availableRoomsList.innerHTML = '<div class="no-rooms">❌ Failed to load rooms</div>';
+                this.roomCount.textContent = 'Error loading rooms';
+            }
+        } catch (error) {
+            console.error('Failed to load rooms:', error);
+            this.availableRoomsList.innerHTML = '<div class="no-rooms">❌ Connection error</div>';
+            this.roomCount.textContent = 'Connection error';
+        }
+    }
+
+    displayAvailableRooms(rooms) {
+        if (!rooms || rooms.length === 0) {
+            this.availableRoomsList.innerHTML = `
+                <div class="no-rooms">
+                    🏠 No rooms available yet<br>
+                    <small>Click "New Room" to create the first room!</small>
+                </div>
+            `;
+            return;
+        }
+
+        // Get participant counts for each room
+        this.getRoomParticipantCounts(rooms).then(roomsWithCounts => {
+            const roomsHtml = roomsWithCounts.map(room => this.createRoomCard(room)).join('');
+            this.availableRoomsList.innerHTML = roomsHtml;
+            
+            // Add click event listeners to room cards
+            this.bindRoomCardEvents();
+        });
+    }
+
+    async getRoomParticipantCounts(rooms) {
+        const roomsWithCounts = [];
+        
+        for (const room of rooms) {
+            try {
+                const response = await fetch(`${this.apiBase}api.php?action=peers&roomId=${room.room_id}`);
+                const result = await response.json();
+                
+                roomsWithCounts.push({
+                    ...room,
+                    participantCount: result.success ? result.data.peers.length : 0
+                });
+            } catch (error) {
+                console.error(`Failed to get participant count for room ${room.room_id}:`, error);
+                roomsWithCounts.push({
+                    ...room,
+                    participantCount: 0
+                });
+            }
+        }
+        
+        return roomsWithCounts;
+    }
+
+    createRoomCard(room) {
+        const participantCount = room.participantCount || 0;
+        const isFull = participantCount >= 4;
+        const isCurrentRoom = room.room_id === this.roomId && this.isConnected;
+        
+        const displayId = room.room_id.split('_')[0]; // Show only 3-digit part for clean display
+        const timestamp = room.room_id.split('_')[1];
+        const createdTime = timestamp ? new Date(parseInt(timestamp) * 1000).toLocaleString() : room.created_at;
+        
+        return `
+            <div class="room-card ${isFull ? 'full' : ''} ${isCurrentRoom ? 'current' : ''}" 
+                 data-room-id="${room.room_id}" 
+                 data-room-name="${room.name}">
+                <div class="room-id">#${displayId}</div>
+                <div class="room-name">${room.name}</div>
+                <div class="room-info">
+                    <small>Created: ${createdTime}</small>
+                    <span class="room-participants ${isFull ? 'full' : ''}">
+                        ${participantCount}/4
+                    </span>
+                </div>
+                ${isFull ? '<div style="font-size: 0.8rem; color: #dc3545; margin-top: 0.5rem;">Room Full</div>' : ''}
+                ${isCurrentRoom ? '<div style="font-size: 0.8rem; color: #28a745; margin-top: 0.5rem;">Current Room</div>' : ''}
+            </div>
+        `;
+    }
+
+    bindRoomCardEvents() {
+        const roomCards = document.querySelectorAll('.room-card');
+        
+        roomCards.forEach(card => {
+            card.addEventListener('click', async () => {
+                const roomId = card.dataset.roomId;
+                const roomName = card.dataset.roomName;
+                const isFull = card.classList.contains('full');
+                const isCurrentRoom = card.classList.contains('current');
+                
+                if (isFull) {
+                    this.showMessage('Room is full (4/4 participants)', 'error');
+                    return;
+                }
+                
+                if (isCurrentRoom) {
+                    this.showMessage('You are already in this room', 'info');
+                    return;
+                }
+                
+                if (this.isConnected) {
+                    const confirmJoin = confirm(`Leave current room and join "${roomName}" (#${roomId.split('_')[0]})?`);
+                    if (!confirmJoin) return;
+                    
+                    console.log('🔄 Switching rooms - leaving current room first');
+                    await this.leaveRoom();
+                    // Wait for cleanup to complete
+                    await new Promise(resolve => setTimeout(resolve, 750));
+                }
+                
+                // Set username if not already set
+                if (!this.usernameInput.value.trim()) {
+                    this.usernameInput.value = 'User' + Math.floor(Math.random() * 1000);
+                }
+                
+                // Set room info and join
+                this.roomInput.value = roomId;
+                this.roomId = roomId;
+                
+                this.showMessage(`Joining room "${roomName}" (#${roomId.split('_')[0]})...`, 'info');
+                await this.joinRoom();
+            });
+        });
     }
 }
 

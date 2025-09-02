@@ -14,6 +14,45 @@ class Signal {
         return $this->db->query($sql, [$roomId, $name]);
     }
 
+    public function generateUniqueRoomId() {
+        do {
+            // Generate 3-digit random number (100-999)
+            $threeDigit = str_pad(mt_rand(100, 999), 3, '0', STR_PAD_LEFT);
+            
+            // Add timestamp-based suffix to ensure uniqueness
+            $timestamp = time();
+            $roomId = $threeDigit . '_' . $timestamp;
+            
+            // Check if this room ID already exists
+            $sql = "SELECT COUNT(*) as count FROM rooms WHERE room_id = ?";
+            $stmt = $this->db->query($sql, [$roomId]);
+            $result = $stmt->fetch();
+            
+        } while ($result['count'] > 0); // Keep generating until we get a unique ID
+        
+        return $roomId;
+    }
+    
+    public function getAllRooms() {
+        // Only return rooms that have active participants
+        $sql = "SELECT r.room_id, r.name, r.created_at, r.is_active 
+                FROM rooms r 
+                WHERE EXISTS (
+                    SELECT 1 FROM peers p 
+                    WHERE p.room_id = r.room_id AND p.is_connected = 1
+                )
+                ORDER BY r.created_at DESC";
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll();
+    }
+
+    public function getAllRoomsIncludingEmpty() {
+        // Return all rooms regardless of participant count (for admin purposes)
+        $sql = "SELECT room_id, name, created_at, is_active FROM rooms ORDER BY created_at DESC";
+        $stmt = $this->db->query($sql);
+        return $stmt->fetchAll();
+    }
+
     public function joinRoom($roomId, $peerId, $username = null) {
         // First, ensure room exists
         $this->ensureRoomExists($roomId);
@@ -73,13 +112,15 @@ class Signal {
     }
 
     public function cleanupOldMessages($hoursOld = 24) {
-        $sql = "DELETE FROM signaling_messages WHERE created_at < datetime('now', '-' || ? || ' hours')";
-        return $this->db->query($sql, [$hoursOld]);
+        $sql = "DELETE FROM signaling_messages WHERE created_at < datetime('now', '-" . intval($hoursOld) . " hours')";
+        $stmt = $this->db->query($sql);
+        return $stmt->rowCount(); // Return number of deleted rows
     }
 
     public function cleanupInactivePeers($minutesOld = 30) {
-        $sql = "DELETE FROM peers WHERE last_seen < datetime('now', '-' || ? || ' minutes')";
-        return $this->db->query($sql, [$minutesOld]);
+        $sql = "DELETE FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')";
+        $stmt = $this->db->query($sql);
+        return $stmt->rowCount(); // Return number of deleted rows
     }
 
     private function ensureRoomExists($roomId) {

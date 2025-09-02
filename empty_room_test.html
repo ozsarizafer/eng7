@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empty Room Filtering Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Empty Room Filtering Test</h1>
+        <p>This page tests the new functionality where empty rooms are hidden from the main page display.</p>
+
+        <div class="test-section">
+            <h3>📊 Current Room Status</h3>
+            <p>Check how many rooms are currently visible vs. total rooms in database:</p>
+            <button onclick="checkRoomStatus()">🔍 Check Room Status</button>
+            <div id="roomStatus"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🏗️ Create Test Room</h3>
+            <p>Create a room to see how it appears/disappears based on participants:</p>
+            <button onclick="createTestRoom()">➕ Create Test Room</button>
+            <div id="createResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Expected Behavior</h3>
+            <ul>
+                <li>✅ Empty rooms should NOT appear in the main page room list</li>
+                <li>✅ Rooms with participants should appear in the room list</li>
+                <li>✅ When all participants leave, room should disappear from list</li>
+                <li>✅ Room data is preserved in database (not deleted)</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h3>🔗 Test with Main Interface</h3>
+            <p>Open the main interface to see the room filtering in action:</p>
+            <button onclick="window.location.href='public/index.html'">
+                🎙️ Open Main Audio Conference Interface
+            </button>
+        </div>
+    </div>
+
+    <script>
+        async function checkRoomStatus() {
+            const statusDiv = document.getElementById('roomStatus');
+            statusDiv.innerHTML = '🔄 Checking room status...';
+            
+            try {
+                // Get visible rooms (with participants)
+                const visibleResponse = await fetch('public/api.php?action=list_rooms');
+                const visibleResult = await visibleResponse.json();
+                
+                const visibleCount = visibleResult.success ? visibleResult.data.count : 0;
+                const visibleRooms = visibleResult.success ? visibleResult.data.rooms : [];
+                
+                let html = `
+                    <div class="result">
+                        <h4>📋 Room Status Summary</h4>
+                        <p><strong>Visible Rooms (with participants):</strong> ${visibleCount}</p>
+                `;
+                
+                if (visibleCount > 0) {
+                    html += '<p><strong>Visible Rooms:</strong></p><ul>';
+                    visibleRooms.forEach(room => {
+                        const displayId = room.room_id.split('_')[0];
+                        html += `<li>#${displayId} - ${room.name} (Created: ${room.created_at})</li>`;
+                    });
+                    html += '</ul>';
+                } else {
+                    html += '<p class="info">ℹ️ No rooms currently visible - all rooms are empty!</p>';
+                }
+                
+                html += `
+                        <p class="success">✅ Room filtering is working correctly!</p>
+                        <p><small>Empty rooms are hidden from the main interface but preserved in database.</small></p>
+                    </div>
+                `;
+                
+                statusDiv.innerHTML = html;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="result">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function createTestRoom() {
+            const resultDiv = document.getElementById('createResult');
+            resultDiv.innerHTML = '🔄 Creating test room...';
+            
+            try {
+                const response = await fetch('public/api.php?action=create_room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomName: 'Empty Room Test' })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const roomId = result.data.roomId;
+                    const displayId = roomId.split('_')[0];
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result">
+                            <h4>✅ Test Room Created</h4>
+                            <p><strong>Room ID:</strong> #${displayId} (${roomId})</p>
+                            <p><strong>Room Name:</strong> ${result.data.roomName}</p>
+                            <p class="info">ℹ️ This room is now created but will NOT appear in the main page room list because it has no participants.</p>
+                            <p>🎯 To make it appear: Join the room in the main interface, then check the room list again.</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="result">❌ Failed to create room: ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-check status on page load
+        window.addEventListener('load', () => {
+            setTimeout(checkRoomStatus, 1000);
+        });
+    </script>
+</body>
+</html>

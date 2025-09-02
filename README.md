@@ -2,6 +2,8 @@
 
 ## Features
 - **4-Person Audio Conference**: Maximum 4 participants per room
+- **Smart Room Management**: 3-digit + timestamp room IDs prevent duplicates
+- **Auto-Join New Rooms**: Click "New Room" to create and automatically join
 - **Multi-Device Support**: Works across different devices on the same network
 - **Network Access**: Automatic IP detection and sharing URLs
 - **Audio-Only Communication**: Optimized for voice chat
@@ -44,10 +46,30 @@
 
 ### Joining a Conference
 1. Enter your username (optional)
-2. Enter room ID (or use 'default')
-3. Click "Join Room"
-4. Click "Join Audio" to enable microphone
-5. You'll automatically connect to other participants
+2. **Option A**: Enter existing room ID (3-digit format like "123_1756845123")
+3. **Option B**: Click "New Room" to create a unique room with automatic join
+4. **Option C**: Browse and click on available rooms in the "Available Rooms" section
+5. Click "Join Room" (if entering existing room ID manually)
+6. You'll automatically connect with audio enabled
+
+### Clickable Room Interface
+- **Visual Room Cards**: See all available rooms displayed as clickable cards
+- **Real-time Participant Count**: Each room shows current participants (e.g., "2/4")
+- **Click-to-Join**: Simply click on any room card to join that room instantly
+- **Room Status Indicators**: Full rooms (4/4) are visually disabled
+- **Current Room Highlighting**: Your current room is highlighted in green
+- **Automatic Refresh**: Room list updates when joining/leaving rooms
+- **Auto-generated Usernames**: System generates usernames if none provided
+- **Smart Room Filtering**: Empty rooms are automatically hidden from the interface
+  - Rooms with no participants don't appear in the room list
+  - When all participants leave a room, it disappears from the interface
+  - Room data is preserved in database for potential future use
+  - Keeps the interface clean and shows only joinable rooms
+
+### Room ID Format
+- **New Format**: 3-digit number + timestamp (e.g., "456_1756845123")
+- **Benefits**: Prevents duplicate rooms, easy to share, timestamp-based uniqueness
+- **Generation**: Automatic via "New Room" button or manual entry
 
 ### Audio Controls
 - **Join Audio**: Enable microphone and join voice chat
@@ -86,6 +108,9 @@ WebRTC P2P Audio Connections
 - `POST /api.php?action=signal` - Send WebRTC signals
 - `GET /api.php?action=events` - SSE stream for real-time updates
 - `GET /api.php?action=peers` - Get room participants
+- `POST /api.php?action=create_room` - Create new room with unique 3-digit + timestamp ID
+- `GET /api.php?action=list_rooms` - Get all available rooms for clickable interface
+- `GET /api.php?action=cleanup` - Manual cleanup of inactive peers and old messages
 
 ## Database Schema
 - **rooms**: Conference room management
@@ -158,5 +183,11 @@ WebRTC P2P Audio Connections
 - Only 4 people can join the same room
 - Try a different room ID
 - Wait for someone to leave the current room
+- **Quick Fix**: Run `http://localhost/eng7/cleanup_db.php` to clear all inactive participants
+
+### Database Cleanup
+- **Automatic**: Inactive peers are automatically removed after 5 minutes
+- **Manual**: Visit `http://localhost/eng7/cleanup_db.php` to force cleanup all rooms
+- **API**: Call `http://localhost/eng7/public/api.php?action=cleanup` for programmatic cleanup
 
 Enjoy your 4-person audio conference! 🎙️

@@ -196,7 +196,11 @@
                 <span class="test-result pending" id="dbTest">⏳ Pending</span>
             </div>
             <div class="test-item">
-                <span>WebRTC STUN Servers</span>
+                <span>Local STUN Server</span>
+                <span class="test-result pending" id="localStunTest">⏳ Pending</span>
+            </div>
+            <div class="test-item">
+                <span>WebRTC STUN Connectivity</span>
                 <span class="test-result pending" id="stunTest">⏳ Pending</span>
             </div>
             <div class="test-item">
@@ -390,10 +394,59 @@
                 document.getElementById('dbTest').className = 'test-result fail';
             }
 
-            // Test 3: STUN Servers
+            // Test 3: Local STUN Server
             try {
+                console.log('Testing local STUN server configuration...');
+                const stunConfigUrl = apiBase + 'stun_config.php?action=config';
+                const configResponse = await fetch(stunConfigUrl, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                if (configResponse.ok) {
+                    const config = await configResponse.json();
+                    
+                    if (config.success && config.stun_servers) {
+                        // Test local STUN server endpoint
+                        const testUrl = apiBase + 'stun_server.php?action=binding';
+                        const stunResponse = await fetch(testUrl, {
+                            method: 'GET',
+                            cache: 'no-cache'
+                        });
+                        
+                        if (stunResponse.ok) {
+                            const stunData = await stunResponse.json();
+                            if (stunData.success) {
+                                document.getElementById('localStunTest').textContent = '✅ Pass';
+                                document.getElementById('localStunTest').className = 'test-result pass';
+                                console.log('Local STUN server working:', stunData.mapped_address);
+                            } else {
+                                throw new Error('STUN server returned error');
+                            }
+                        } else {
+                            throw new Error(`STUN server HTTP ${stunResponse.status}`);
+                        }
+                    } else {
+                        throw new Error('Invalid STUN configuration');
+                    }
+                } else {
+                    throw new Error(`Config HTTP ${configResponse.status}`);
+                }
+            } catch (error) {
+                console.error('Local STUN test failed:', error);
+                document.getElementById('localStunTest').textContent = `❌ Fail: ${error.message}`;
+                document.getElementById('localStunTest').className = 'test-result fail';
+            }
+
+            // Test 4: WebRTC STUN Connectivity (using local + fallback)
+            try {
+                // Test with local STUN server first
+                const localStunUrl = `stun:${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? 443 : 80)}`;
                 const pc = new RTCPeerConnection({ 
-                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] 
+                    iceServers: [
+                        { urls: localStunUrl },
+                        { urls: 'stun:stun.l.google.com:19302' } // fallback
+                    ]
                 });
                 
                 const hasStun = await new Promise((resolve) => {
@@ -402,6 +455,7 @@
                     pc.onicecandidate = (event) => {
                         if (event.candidate && !candidateReceived) {
                             candidateReceived = true;
+                            console.log('ICE candidate received:', event.candidate.candidate);
                             resolve(true);
                         }
                     };
@@ -424,11 +478,12 @@
                     document.getElementById('stunTest').className = 'test-result fail';
                 }
             } catch (error) {
+                console.error('WebRTC STUN test failed:', error);
                 document.getElementById('stunTest').textContent = '❌ Fail';
                 document.getElementById('stunTest').className = 'test-result fail';
             }
 
-            // Test 4: Microphone Access
+            // Test 5: Microphone Access
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 stream.getTracks().forEach(track => track.stop());
@@ -479,10 +534,20 @@
                         suggestions += '<li>Check file permissions for SQLite database</li>';
                         suggestions += '</ul></li>';
                         break;
-                    case 'WebRTC STUN Servers':
-                        suggestions += '<li><strong>STUN Server Issue:</strong><ul>';
-                        suggestions += '<li>Check internet connection</li>';
+                    case 'Local STUN Server':
+                        suggestions += '<li><strong>Local STUN Server Issue:</strong><ul>';
+                        suggestions += '<li>Check if <a href="stun_server.php" target="_blank">stun_server.php</a> is accessible</li>';
+                        suggestions += '<li>Verify Apache is running and PHP extensions are enabled</li>';
+                        suggestions += '<li>Check <a href="stun_config.php?action=config" target="_blank">STUN configuration</a></li>';
+                        suggestions += '<li>Ensure no firewall blocking local server communication</li>';
+                        suggestions += '</ul></li>';
+                        break;
+                    case 'WebRTC STUN Connectivity':
+                        suggestions += '<li><strong>WebRTC STUN Issue:</strong><ul>';
+                        suggestions += '<li>Check internet connection for fallback STUN servers</li>';
                         suggestions += '<li>Verify firewall is not blocking WebRTC traffic</li>';
+                        suggestions += '<li>Try refreshing the page to retry connection</li>';
+                        suggestions += '<li>Check browser console for WebRTC errors</li>';
                         suggestions += '</ul></li>';
                         break;
                     case 'Microphone Access':
