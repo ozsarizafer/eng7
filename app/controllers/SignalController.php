@@ -60,7 +60,7 @@ class SignalController {
                     $this->sendError('Invalid action', 400);
             }
         } catch (Exception $e) {
-            error_log("SignalController error: " . $e->getMessage());
+            error_log("SignalController error in action '$action': " . $e->getMessage());
             $this->sendError('Server error: ' . $e->getMessage(), 500);
         }
     }
@@ -76,24 +76,38 @@ class SignalController {
             return;
         }
 
-        // Clean up inactive peers before checking capacity (peers inactive for more than 5 minutes)
-        $this->signal->cleanupInactivePeers(5);
-        
-        // Also clean up old signaling messages
-        $this->signal->cleanupOldMessages(1); // Clean messages older than 1 hour
-        
-        // Remove any existing entry for this peer (rejoin scenario)
-        $this->signal->leavePeer($peerId);
+        try {
+            // Clean up inactive peers before checking capacity (peers inactive for more than 5 minutes)
+            try {
+                $this->signal->cleanupInactivePeers(5);
+            } catch (Exception $cleanupError) {
+                error_log("Cleanup failed, continuing with join: " . $cleanupError->getMessage());
+                // Don't let cleanup failure prevent joining
+            }
+            
+            // Also clean up old signaling messages
+            try {
+                $this->signal->cleanupOldMessages(1); // Clean messages older than 1 hour
+            } catch (Exception $cleanupError) {
+                error_log("Message cleanup failed, continuing with join: " . $cleanupError->getMessage());
+                // Don't let cleanup failure prevent joining
+            }
+            // Remove any existing entry for this peer (rejoin scenario)
+            $this->signal->leavePeer($peerId);
 
-        // Check room capacity (max 4 peers) after cleanup
-        $currentPeers = $this->signal->getRoomPeers($roomId);
-        
-        if (count($currentPeers) >= 4) {
-            $this->sendError('Room is full. Maximum 4 participants allowed.', 403);
-            return;
+            // Check room capacity (max 4 peers) after cleanup
+            $currentPeers = $this->signal->getRoomPeers($roomId);
+            
+            if (count($currentPeers) >= 4) {
+                $this->sendError('Room is full. Maximum 4 participants allowed.', 403);
+                return;
+            }
+
+            $this->signal->joinRoom($roomId, $peerId, $username);
+        } catch (Exception $e) {
+            error_log("Error in handleJoin: " . $e->getMessage());
+            throw $e; // Re-throw to be caught by main exception handler
         }
-
-        $this->signal->joinRoom($roomId, $peerId, $username);
         
         // Get all current peers for the new joiner
         $allPeers = $this->signal->getRoomPeers($roomId);

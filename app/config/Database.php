@@ -61,8 +61,8 @@ class Database {
             $stmt->execute($params);
             return $stmt;
         } catch (PDOException $e) {
-            error_log("Query failed: " . $e->getMessage());
-            throw new Exception("Query execution failed");
+            error_log("Query failed: " . $e->getMessage() . " - SQL: $sql");
+            throw new Exception("Query execution failed: " . $e->getMessage());
         }
     }
 

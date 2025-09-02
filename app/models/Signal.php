@@ -54,15 +54,28 @@ class Signal {
     }
 
     public function joinRoom($roomId, $peerId, $username = null) {
-        // First, ensure room exists
-        $this->ensureRoomExists($roomId);
+        try {
+            // First, ensure room exists and get confirmation
+            $this->ensureRoomExists($roomId);
+            
+            // Verify the room actually exists before proceeding
+            $sql = "SELECT room_id FROM rooms WHERE room_id = ?";
+            $stmt = $this->db->query($sql, [$roomId]);
+            $room = $stmt->fetch();
+            
+            if (!$room) {
+                throw new Exception("Room does not exist: $roomId");
+            }
 
-        // Remove any existing peer connection
-        $this->leavePeer($peerId);
+            // Remove any existing peer connection
+            $this->leavePeer($peerId);
 
-        // Add new peer to room
-        $sql = "INSERT INTO peers (peer_id, room_id, username) VALUES (?, ?, ?)";
-        return $this->db->query($sql, [$peerId, $roomId, $username]);
+            // Add new peer to room using the confirmed room_id
+            $sql = "INSERT INTO peers (peer_id, room_id, username) VALUES (?, ?, ?)";
+            return $this->db->query($sql, [$peerId, $room['room_id'], $username]);
+        } catch (Exception $e) {
+            throw $e;
+        }
     }
 
     public function leavePeer($peerId) {
@@ -112,15 +125,43 @@ class Signal {
     }
 
     public function cleanupOldMessages($hoursOld = 24) {
-        $sql = "DELETE FROM signaling_messages WHERE created_at < datetime('now', '-" . intval($hoursOld) . " hours')";
-        $stmt = $this->db->query($sql);
-        return $stmt->rowCount(); // Return number of deleted rows
+        try {
+            $sql = "DELETE FROM signaling_messages WHERE created_at < datetime('now', '-" . intval($hoursOld) . " hours')";
+            $stmt = $this->db->query($sql);
+            return $stmt->rowCount(); // Return number of deleted rows
+        } catch (Exception $e) {
+            error_log("Error cleaning up old messages: " . $e->getMessage());
+            return 0; // Return 0 if cleanup fails, don't break the join process
+        }
     }
 
     public function cleanupInactivePeers($minutesOld = 30) {
-        $sql = "DELETE FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')";
-        $stmt = $this->db->query($sql);
-        return $stmt->rowCount(); // Return number of deleted rows
+        // Temporarily disable foreign key checks for cleanup
+        $this->db->query("PRAGMA foreign_keys = OFF");
+        
+        try {
+            // First, delete signaling messages for inactive peers
+            $sql = "DELETE FROM signaling_messages WHERE from_peer_id IN (
+                        SELECT peer_id FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')
+                    ) OR to_peer_id IN (
+                        SELECT peer_id FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')
+                    )";
+            $this->db->query($sql);
+            
+            // Then delete the inactive peers
+            $sql = "DELETE FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')";
+            $stmt = $this->db->query($sql);
+            $deletedCount = $stmt->rowCount();
+            
+            // Re-enable foreign key checks
+            $this->db->query("PRAGMA foreign_keys = ON");
+            
+            return $deletedCount;
+        } catch (Exception $e) {
+            // Re-enable foreign key checks in case of error
+            $this->db->query("PRAGMA foreign_keys = ON");
+            throw $e;
+        }
     }
 
     private function ensureRoomExists($roomId) {
@@ -129,7 +170,10 @@ class Signal {
         $result = $stmt->fetch();
         
         if ($result['count'] == 0) {
-            $this->createRoom($roomId, 'Room ' . $roomId);
+            // Extract the 3-digit portion for the room name
+            $threeDigitPart = explode('_', $roomId)[0];
+            $roomName = 'Room ' . $threeDigitPart;
+            $this->createRoom($roomId, $roomName);
         }
     }
 
