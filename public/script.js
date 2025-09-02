@@ -39,8 +39,6 @@ class AudioConferenceClient {
         // Button elements
         this.joinBtn = document.getElementById('joinBtn');
         this.leaveBtn = document.getElementById('leaveBtn');
-        this.startAudioBtn = document.getElementById('startAudioBtn');
-        this.stopAudioBtn = document.getElementById('stopAudioBtn');
         this.muteBtn = document.getElementById('muteBtn');
         this.unmuteBtn = document.getElementById('unmuteBtn');
         
@@ -65,8 +63,6 @@ class AudioConferenceClient {
     bindEvents() {
         this.joinBtn.addEventListener('click', () => this.joinRoom());
         this.leaveBtn.addEventListener('click', () => this.leaveRoom());
-        this.startAudioBtn.addEventListener('click', () => this.startAudio());
-        this.stopAudioBtn.addEventListener('click', () => this.stopAudio());
         this.muteBtn.addEventListener('click', () => this.muteAudio());
         this.unmuteBtn.addEventListener('click', () => this.unmuteAudio());
 
@@ -662,8 +658,6 @@ class AudioConferenceClient {
         // Enable/disable buttons based on connection state
         this.joinBtn.disabled = this.isConnected;
         this.leaveBtn.disabled = !this.isConnected;
-        this.startAudioBtn.disabled = !this.isConnected || hasAudio;
-        this.stopAudioBtn.disabled = !hasAudio;
         this.muteBtn.disabled = !hasAudio || this.isMuted;
         this.unmuteBtn.disabled = !hasAudio || !this.isMuted;
 
