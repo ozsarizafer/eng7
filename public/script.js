@@ -77,10 +77,8 @@ class AudioConferenceClient {
         this.unmuteBtn.addEventListener('click', () => this.unmuteAudio());
         this.refreshRoomsBtn.addEventListener('click', () => this.loadAvailableRooms());
 
-        // Handle page unload
-        window.addEventListener('beforeunload', () => {
-            this.leaveRoom();
-        });
+        // Enhanced disconnect detection system
+        this.setupDisconnectHandlers();
         
         // Load available rooms on page load
         this.loadAvailableRooms();
@@ -88,6 +86,139 @@ class AudioConferenceClient {
 
     generatePeerId() {
         return 'peer_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    }
+
+    setupDisconnectHandlers() {
+        // 1. Page navigation/close detection
+        window.addEventListener('beforeunload', (event) => {
+            if (this.isConnected) {
+                // Use sendBeacon for reliable leave notification
+                const leaveData = JSON.stringify({
+                    roomId: this.roomId,
+                    peerId: this.peerId,
+                    reason: 'page_unload'
+                });
+                
+                try {
+                    navigator.sendBeacon(
+                        this.apiBase + 'api.php?action=leave',
+                        new Blob([leaveData], { type: 'application/json' })
+                    );
+                } catch (error) {
+                    console.log('Beacon failed, trying sync request');
+                    // Fallback to synchronous request
+                    this.syncLeaveRoom();
+                }
+            }
+        });
+
+        // 2. Page hide/show detection (tab switching, mobile background)
+        window.addEventListener('pagehide', () => {
+            if (this.isConnected) {
+                const leaveData = JSON.stringify({
+                    roomId: this.roomId,
+                    peerId: this.peerId,
+                    reason: 'page_hide'
+                });
+                
+                navigator.sendBeacon(
+                    this.apiBase + 'api.php?action=leave',
+                    new Blob([leaveData], { type: 'application/json' })
+                );
+            }
+        });
+
+        // 3. Visibility change with inactivity timeout
+        let inactivityTimer = null;
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Start inactivity timer when tab becomes hidden
+                inactivityTimer = setTimeout(() => {
+                    if (this.isConnected && document.hidden) {
+                        console.log('🕐 Tab inactive for 30 seconds, leaving room');
+                        this.leaveRoom('tab_inactive');
+                    }
+                }, 30000); // 30 seconds timeout
+            } else {
+                // Clear timer when tab becomes visible again
+                if (inactivityTimer) {
+                    clearTimeout(inactivityTimer);
+                    inactivityTimer = null;
+                }
+            }
+        });
+
+        // 4. Network connectivity detection
+        window.addEventListener('online', () => {
+            console.log('🌐 Network reconnected');
+            if (this.isConnected && this.eventSource?.readyState !== EventSource.OPEN) {
+                console.log('🔄 Restarting SSE connection');
+                this.startSignaling();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('📵 Network disconnected');
+            // Don't leave room immediately, wait for reconnection
+        });
+
+        // 5. Heartbeat mechanism for connection monitoring
+        this.startHeartbeat();
+    }
+
+    syncLeaveRoom() {
+        // Synchronous leave request for beforeunload scenarios
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', this.apiBase + 'api.php?action=leave', false); // false = synchronous
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify({
+                roomId: this.roomId,
+                peerId: this.peerId,
+                reason: 'sync_leave'
+            }));
+        } catch (error) {
+            console.log('Sync leave failed:', error);
+        }
+    }
+
+    startHeartbeat() {
+        // Send heartbeat every 10 seconds when connected
+        this.heartbeatInterval = setInterval(() => {
+            if (this.isConnected && navigator.onLine) {
+                fetch(this.apiBase + 'api.php?action=heartbeat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        peerId: this.peerId,
+                        roomId: this.roomId
+                    })
+                }).catch(error => {
+                    console.log('Heartbeat failed:', error);
+                    // After 3 failed heartbeats, consider connection lost
+                    this.heartbeatFailCount = (this.heartbeatFailCount || 0) + 1;
+                    if (this.heartbeatFailCount >= 3) {
+                        console.log('💔 Connection lost after 3 failed heartbeats');
+                        this.handleConnectionLoss();
+                    }
+                });
+            }
+        }, 10000);
+    }
+
+    handleConnectionLoss() {
+        console.log('🔌 Handling connection loss');
+        this.isConnected = false;
+        this.updateStatus('disconnected', 'Connection lost');
+        this.resetConnectionState();
+        this.showMessage('Connection lost. Please rejoin the room.', 'error');
+        this.updateUI();
+        
+        // Stop heartbeat
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
     }
 
     async initializeLocalStun() {
@@ -323,6 +454,10 @@ class AudioConferenceClient {
                 this.startSignaling();
                 this.loadPeers();
                 
+                // Start heartbeat mechanism
+                this.heartbeatFailCount = 0;
+                this.startHeartbeat();
+                
                 // Start audio and wait for it to be ready
                 await this.startAudio();
                 
@@ -343,7 +478,29 @@ class AudioConferenceClient {
                 // Refresh room list to update participant counts
                 setTimeout(() => this.loadAvailableRooms(), 1000);
             } else {
-                this.showMessage('Failed to join room: ' + result.error, 'error');
+                // Enhanced error handling for different error types
+                if (result.error && result.error.includes('constraint')) {
+                    console.log('🔧 Foreign key constraint detected, attempting repair...');
+                    this.showMessage('Database synchronization issue detected. Attempting automatic repair...', 'warning');
+                    
+                    try {
+                        await this.repairDatabaseAndRetry();
+                    } catch (repairError) {
+                        this.showMessage('Failed to repair database. Please refresh the page or contact support.', 'error');
+                    }
+                } else if (result.error && result.error.includes('locked')) {
+                    console.log('🔒 Database locked detected, attempting unlock and retry...');
+                    this.showMessage('Database is temporarily locked. Attempting to unlock...', 'warning');
+                    
+                    try {
+                        await this.unlockDatabaseAndRetry();
+                    } catch (unlockError) {
+                        this.showMessage('Failed to unlock database. Please try the manual unlock tool.', 'error');
+                        this.showDatabaseLockHelp();
+                    }
+                } else {
+                    this.showMessage('Failed to join room: ' + result.error, 'error');
+                }
             }
         } catch (error) {
             console.error('Join room error:', error);
@@ -352,21 +509,243 @@ class AudioConferenceClient {
 
         this.updateUI();
     }
+    
+    async repairDatabaseAndRetry() {
+        console.log('🔧 Attempting database repair and retry...');
+        
+        try {
+            // Force cleanup to resolve foreign key issues
+            const cleanupResponse = await fetch(this.apiBase + 'api.php?action=cleanup', {
+                method: 'GET'
+            });
+            
+            if (cleanupResponse.ok) {
+                const cleanupResult = await cleanupResponse.json();
+                console.log('🧩 Cleanup completed:', cleanupResult);
+                
+                // Wait a bit for cleanup to complete
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Try joining again
+                this.showMessage('Database repaired. Retrying room join...', 'info');
+                
+                const retryResponse = await fetch(this.apiBase + 'api.php?action=join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roomId: this.roomId,
+                        peerId: this.peerId,
+                        username: this.username
+                    })
+                });
+                
+                const retryResult = await retryResponse.json();
+                
+                if (retryResult.success) {
+                    this.showMessage('✅ Successfully joined after repair!', 'success');
+                    // Process successful join
+                    this.isConnected = true;
+                    this.existingPeers = retryResult.data.existingPeers || [];
+                    this.updateStatus('connected', 'Connected to room: ' + this.roomId);
+                    this.currentRoom.textContent = this.roomId;
+                    this.updateLocalParticipant();
+                    
+                    this.startSignaling();
+                    this.loadPeers();
+                    this.heartbeatFailCount = 0;
+                    this.startHeartbeat();
+                    
+                    await this.startAudio();
+                    
+                    // Create connections to existing peers
+                    for (let i = 0; i < this.existingPeers.length; i++) {
+                        const peer = this.existingPeers[i];
+                        await this.createOfferToPeer(peer.peer_id);
+                        if (i < this.existingPeers.length - 1) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    }
+                    
+                    setTimeout(() => this.loadAvailableRooms(), 1000);
+                } else {
+                    throw new Error('Retry failed: ' + retryResult.error);
+                }
+            } else {
+                throw new Error('Cleanup request failed');
+            }
+        } catch (error) {
+            console.error('🚨 Repair failed:', error);
+            throw error;
+        }
+    }
+    
+    async unlockDatabaseAndRetry() {
+        console.log('🔓 Attempting database unlock and retry...');
+        
+        try {
+            // First, try to unlock the database using the unlock endpoint
+            const unlockResponse = await fetch(this.apiBase + 'api.php?action=unlock', {
+                method: 'POST'
+            });
+            
+            if (unlockResponse.ok) {
+                console.log('🔓 Database unlock completed');
+                
+                // Wait a bit for unlock to complete
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Try joining again with exponential backoff
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                    this.showMessage(`Database unlocked. Retry attempt ${attempt}/3...`, 'info');
+                    
+                    const retryResponse = await fetch(this.apiBase + 'api.php?action=join', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            roomId: this.roomId,
+                            peerId: this.peerId,
+                            username: this.username
+                        })
+                    });
+                    
+                    const retryResult = await retryResponse.json();
+                    
+                    if (retryResult.success) {
+                        this.showMessage('✅ Successfully joined after database unlock!', 'success');
+                        // Process successful join
+                        this.isConnected = true;
+                        this.existingPeers = retryResult.data.existingPeers || [];
+                        this.updateStatus('connected', 'Connected to room: ' + this.roomId);
+                        this.currentRoom.textContent = this.roomId;
+                        this.updateLocalParticipant();
+                        
+                        this.startSignaling();
+                        this.loadPeers();
+                        this.heartbeatFailCount = 0;
+                        this.startHeartbeat();
+                        
+                        await this.startAudio();
+                        
+                        // Create connections to existing peers
+                        for (let i = 0; i < this.existingPeers.length; i++) {
+                            const peer = this.existingPeers[i];
+                            await this.createOfferToPeer(peer.peer_id);
+                            if (i < this.existingPeers.length - 1) {
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                            }
+                        }
+                        
+                        setTimeout(() => this.loadAvailableRooms(), 1000);
+                        return; // Success, exit retry loop
+                    } else if (!retryResult.error.includes('locked')) {
+                        // Different error, stop retrying
+                        throw new Error('Retry failed with different error: ' + retryResult.error);
+                    }
+                    
+                    // If still locked, wait before next attempt
+                    if (attempt < 3) {
+                        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                    }
+                }
+                
+                throw new Error('Database remains locked after multiple retry attempts');
+            } else {
+                throw new Error('Unlock request failed');
+            }
+        } catch (error) {
+            console.error('🚨 Database unlock failed:', error);
+            throw error;
+        }
+    }
+    
+    showDatabaseLockHelp() {
+        // Create help dialog for database lock issues
+        const helpDiv = document.createElement('div');
+        helpDiv.className = 'database-lock-help';
+        helpDiv.innerHTML = `
+            <div class="help-overlay">
+                <div class="help-content">
+                    <h3>🔒 Database Lock Error</h3>
+                    <p>The database is temporarily locked. Here are your options:</p>
+                    <ul>
+                        <li><strong>Option 1:</strong> <a href="unlock_database.php" target="_blank">Run Database Unlock Tool</a></li>
+                        <li><strong>Option 2:</strong> Wait 30 seconds and try again</li>
+                        <li><strong>Option 3:</strong> Restart XAMPP Apache service</li>
+                    </ul>
+                    <p><strong>Advanced Fix:</strong> If the problem persists:</p>
+                    <ol>
+                        <li>Stop XAMPP Apache service</li>
+                        <li>Delete .db-wal and .db-shm files in /data/ folder</li>
+                        <li>Restart Apache</li>
+                    </ol>
+                    <button onclick="this.parentElement.parentElement.remove()">Close</button>
+                </div>
+            </div>
+        `;
+        
+        // Add CSS if not already present
+        if (!document.querySelector('.database-lock-help-styles')) {
+            const style = document.createElement('style');
+            style.className = 'database-lock-help-styles';
+            style.textContent = `
+                .help-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10000;
+                }
+                .help-content {
+                    background: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    max-width: 500px;
+                    max-height: 80vh;
+                    overflow-y: auto;
+                }
+                .help-content h3 {
+                    margin-top: 0;
+                    color: #d32f2f;
+                }
+                .help-content button {
+                    background: #1976d2;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    margin-top: 15px;
+                }
+                .help-content button:hover {
+                    background: #1565c0;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(helpDiv);
+    }
 
-    async leaveRoom() {
+    async leaveRoom(reason = 'manual') {
         if (!this.isConnected) return;
 
         try {
             // Complete connection state reset
             this.resetConnectionState();
 
-            // Notify server
+            // Notify server with disconnect reason
             await fetch(this.apiBase + 'api.php?action=leave', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     roomId: this.roomId,
-                    peerId: this.peerId
+                    peerId: this.peerId,
+                    reason: reason
                 })
             });
 
@@ -376,6 +755,15 @@ class AudioConferenceClient {
             this.updateLocalParticipant();
             this.clearRemoteParticipants();
             this.showMessage('Left the conference', 'success');
+            
+            // Stop heartbeat
+            if (this.heartbeatInterval) {
+                clearInterval(this.heartbeatInterval);
+                this.heartbeatInterval = null;
+            }
+            
+            // Reset heartbeat fail count
+            this.heartbeatFailCount = 0;
             
             // Refresh room list to update participant counts
             setTimeout(() => this.loadAvailableRooms(), 500);
@@ -392,6 +780,8 @@ class AudioConferenceClient {
         
         // Increment connection version to invalidate stale ICE candidates
         this.connectionVersion++;
+        
+        console.log(`🔢 Connection version incremented to ${this.connectionVersion} (prevents ufrag errors)`);
         
         // Stop and close all media streams
         this.stopAllMedia();
@@ -415,7 +805,20 @@ class AudioConferenceClient {
         // Clear peer list
         this.existingPeers = [];
         
-        console.log('✅ Connection state reset complete');
+        // Clear enhanced error tracking
+        if (this.ufragErrorCounts) {
+            this.ufragErrorCounts.clear();
+        }
+        
+        // Clear queued candidates
+        if (this.queuedCandidates) {
+            this.queuedCandidates.clear();
+        }
+        
+        // Reset legacy ufrag error counter (for compatibility)
+        this.ufragErrorCount = 0;
+        
+        console.log('✅ Connection state reset complete - all tracking data cleared');
     }
 
     async createNewRoom() {
@@ -511,9 +914,39 @@ class AudioConferenceClient {
         this.showMessage(`${data.username} joined the conference`, 'success');
         this.loadPeers();
         
-        // If we have audio, create connection to new peer
-        if (this.localStream) {
-            await this.createOfferToPeer(data.peerId);
+        // Implement peer ID-based offer collision resolution
+        // Only the peer with the lexicographically smaller ID creates the offer
+        const shouldCreateOffer = this.peerId < data.peerId;
+        
+        if (shouldCreateOffer) {
+            console.log(`📤 Creating offer to ${data.peerId} (peer ID collision resolution)`);
+            
+            // If we have audio, create connection to new peer
+            if (this.localStream && this.localStream.getTracks().length > 0) {
+                await this.createOfferToPeer(data.peerId);
+            } else {
+                console.log('🎤 Starting audio before creating offer to new peer');
+                try {
+                    await this.startAudio();
+                    await this.createOfferToPeer(data.peerId);
+                } catch (error) {
+                    console.error('❌ Failed to start audio for new peer:', error);
+                    // Still try to create connection without audio
+                    await this.createOfferToPeer(data.peerId);
+                }
+            }
+        } else {
+            console.log(`📥 Waiting for offer from ${data.peerId} (peer ID collision resolution)`);
+            
+            // Make sure we have audio ready for when we receive the offer
+            if (!this.localStream || this.localStream.getTracks().length === 0) {
+                console.log('🎤 Preparing audio for incoming offer');
+                try {
+                    await this.startAudio();
+                } catch (error) {
+                    console.error('❌ Failed to prepare audio:', error);
+                }
+            }
         }
     }
 
@@ -554,6 +987,18 @@ class AudioConferenceClient {
     async handleOffer(message) {
         console.log('Handling offer from:', message.from);
         
+        // Check if we have audio - if not, start it automatically
+        if (!this.localStream || this.localStream.getTracks().length === 0) {
+            console.log('🎤 No local audio stream when handling offer - starting audio automatically');
+            try {
+                await this.startAudio();
+                console.log('✅ Audio started successfully for offer handling');
+            } catch (error) {
+                console.error('❌ Failed to start audio for offer handling:', error);
+                // Continue without audio - connection still possible
+            }
+        }
+        
         const peerConnection = await this.createPeerConnection(message.from);
         
         const offer = new RTCSessionDescription(message.data);
@@ -564,6 +1009,8 @@ class AudioConferenceClient {
         
         // Send answer back
         await this.sendSignal(message.from, 'answer', answer);
+        
+        console.log('📞 Answer sent to:', message.from);
     }
 
     async handleAnswer(message) {
@@ -580,22 +1027,441 @@ class AudioConferenceClient {
         console.log('Handling ICE candidate from:', message.from);
         
         const peerConnection = this.peerConnections.get(message.from);
-        if (peerConnection && message.data.candidate) {
-            // Validate connection state before processing candidate
-            if (peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') {
-                console.log(`⚠️ Ignoring ICE candidate for ${message.from} - connection state: ${peerConnection.connectionState}`);
+        if (!peerConnection || !message.data.candidate) {
+            console.log(`⚠️ No valid peer connection found for ${message.from} or no candidate data`);
+            return;
+        }
+        
+        // Validate connection state before processing candidate
+        if (peerConnection.connectionState === 'closed' || peerConnection.connectionState === 'failed') {
+            console.log(`⚠️ Ignoring ICE candidate for ${message.from} - connection state: ${peerConnection.connectionState}`);
+            return;
+        }
+        
+        // Validate connection version to prevent stale candidates (fixes 'Unknown ufrag' error)
+        if (peerConnection.connectionVersion !== this.connectionVersion) {
+            console.log(`⚠️ Ignoring stale ICE candidate for ${message.from} - version mismatch (expected: ${this.connectionVersion}, got: ${peerConnection.connectionVersion})`);
+            return;
+        }
+        
+        // Validate signaling state for safe candidate processing
+        if (peerConnection.signalingState === 'closed') {
+            console.log(`⚠️ Ignoring ICE candidate for ${message.from} - signaling state is closed`);
+            return;
+        }
+        
+        try {
+            const candidate = new RTCIceCandidate(message.data);
+            
+            // Enhanced ICE candidate validation and stability
+            if (!candidate.candidate || candidate.candidate.trim() === '') {
+                console.warn(`⚠️ Empty ICE candidate received from ${message.from}`);
                 return;
             }
             
-            try {
-                const candidate = new RTCIceCandidate(message.data);
-                await peerConnection.addIceCandidate(candidate);
-                console.log(`✅ Added ICE candidate for ${message.from}`);
-            } catch (error) {
+            // Log candidate details for debugging
+            console.log(`🧊 Processing ICE candidate from ${message.from}: ${candidate.candidate.substring(0, 80)}...`);
+            
+            // Validate remote description is set before adding candidates
+            if (!peerConnection.remoteDescription) {
+                console.log(`⚠️ Remote description not set yet, queuing candidate for ${message.from}`);
+                this.queueIceCandidate(message.from, candidate);
+                return;
+            }
+            
+            await peerConnection.addIceCandidate(candidate);
+            console.log(`✅ Added ICE candidate for ${message.from} (type: ${candidate.candidate.split(' ')[7] || 'unknown'})`);
+            
+            // Monitor audio stability after ICE candidate addition
+            this.monitorAudioStabilityAfterIce(message.from);
+            
+        } catch (error) {
+            // Enhanced error logging for debugging ICE issues
+            if (error.message.includes('ufrag')) {
+                console.warn(`⚠️ ICE candidate ufrag mismatch for ${message.from}:`, error.message);
+                console.log(`🔍 Connection version: ${peerConnection.connectionVersion}, Global version: ${this.connectionVersion}`);
+                console.log(`🔍 Connection state: ${peerConnection.connectionState}, Signaling state: ${peerConnection.signalingState}`);
+                
+                // Track ufrag errors per peer for targeted recovery
+                if (!this.ufragErrorCounts) this.ufragErrorCounts = new Map();
+                const errorCount = (this.ufragErrorCounts.get(message.from) || 0) + 1;
+                this.ufragErrorCounts.set(message.from, errorCount);
+                
+                if (errorCount >= 3) {
+                    console.log(`🔄 Multiple ufrag errors detected for ${message.from}, triggering recovery`);
+                    this.handlePersistentUfragError(message.from);
+                }
+            } else if (error.message.includes('InvalidStateError')) {
+                console.warn(`⚠️ ICE candidate state error for ${message.from}: connection not ready, queuing candidate`);
+                this.queueIceCandidate(message.from, candidate);
+            } else {
                 console.warn(`⚠️ Failed to add ICE candidate for ${message.from}:`, error.message);
+                console.log(`🔍 Candidate causing error: ${candidate.candidate}`);
+            }
+        }
+    }
+    
+    handlePersistentUfragError(peerId) {
+        console.log(`🔄 Handling persistent ufrag errors for ${peerId}`);
+        
+        // Reset error count for this specific peer
+        if (this.ufragErrorCounts) {
+            this.ufragErrorCounts.delete(peerId);
+        }
+        
+        // Remove the problematic connection
+        const existingConnection = this.peerConnections.get(peerId);
+        if (existingConnection) {
+            console.log(`🗑️ Closing connection with persistent ufrag errors to ${peerId}`);
+            existingConnection.close();
+            this.peerConnections.delete(peerId);
+        }
+        
+        // Clear queued candidates for this peer
+        if (this.queuedCandidates) {
+            this.queuedCandidates.delete(peerId);
+        }
+        
+        // Remove remote stream
+        if (this.remoteStreams.has(peerId)) {
+            this.remoteStreams.delete(peerId);
+            this.updateRemoteParticipants();
+        }
+        
+        // Wait a bit and attempt to recreate the connection
+        setTimeout(async () => {
+            console.log(`🔄 Attempting to recreate connection to ${peerId} after ufrag errors`);
+            try {
+                // Only recreate if we're still connected to the room
+                if (this.isConnected && this.peerId < peerId) {
+                    // Only if we should be the one creating the offer
+                    await this.createOfferToPeer(peerId);
+                }
+            } catch (error) {
+                console.error(`❌ Failed to recreate connection to ${peerId}:`, error);
+            }
+        }, 2000); // Wait 2 seconds before retry
+    }
+    
+    // NEW: Queue ICE candidates when connection isn't ready
+    queueIceCandidate(peerId, candidate) {
+        if (!this.queuedCandidates) {
+            this.queuedCandidates = new Map();
+        }
+        
+        if (!this.queuedCandidates.has(peerId)) {
+            this.queuedCandidates.set(peerId, []);
+        }
+        
+        const queue = this.queuedCandidates.get(peerId);
+        queue.push(candidate);
+        
+        // Limit queue size to prevent memory issues
+        if (queue.length > 50) {
+            queue.shift(); // Remove oldest candidate
+            console.log(`⚠️ ICE candidate queue for ${peerId} exceeds limit, removing oldest`);
+        }
+        
+        console.log(`📎 Queued ICE candidate for ${peerId} (queue size: ${queue.length})`);
+        
+        // Try to process queue after a delay
+        setTimeout(() => this.processQueuedCandidates(peerId), 500);
+    }
+    
+    // NEW: Process queued ICE candidates
+    async processQueuedCandidates(peerId) {
+        if (!this.queuedCandidates || !this.queuedCandidates.has(peerId)) {
+            return;
+        }
+        
+        const peerConnection = this.peerConnections.get(peerId);
+        if (!peerConnection || !peerConnection.remoteDescription) {
+            console.log(`⚠️ Cannot process queued candidates for ${peerId}: connection not ready`);
+            return;
+        }
+        
+        const queue = this.queuedCandidates.get(peerId);
+        console.log(`🔄 Processing ${queue.length} queued ICE candidates for ${peerId}`);
+        
+        while (queue.length > 0) {
+            const candidate = queue.shift();
+            try {
+                await peerConnection.addIceCandidate(candidate);
+                console.log(`✅ Added queued ICE candidate for ${peerId}`);
+            } catch (error) {
+                console.warn(`⚠️ Failed to add queued ICE candidate for ${peerId}:`, error.message);
+                // Don't continue processing if we're getting errors
+                break;
+            }
+        }
+        
+        // Clear queue if empty
+        if (queue.length === 0) {
+            this.queuedCandidates.delete(peerId);
+        }
+    }
+    
+    // NEW: Monitor audio stability after ICE candidate changes
+    monitorAudioStabilityAfterIce(peerId) {
+        // Check audio quality after ICE processing
+        setTimeout(() => {
+            const remoteStream = this.remoteStreams.get(peerId);
+            if (remoteStream) {
+                const audioTracks = remoteStream.getAudioTracks();
+                audioTracks.forEach((track, index) => {
+                    if (track.readyState !== 'live' || track.muted) {
+                        console.warn(`⚠️ Audio track ${index} for ${peerId} unstable after ICE: readyState=${track.readyState}, muted=${track.muted}`);
+                        this.attemptAudioRecovery(peerId);
+                    }
+                });
+            }
+        }, 1000);
+    }
+    
+    // NEW: Attempt to recover audio for specific peer
+    async attemptAudioRecovery(peerId) {
+        console.log(`🔄 Attempting audio recovery for ${peerId}`);
+        
+        const peerConnection = this.peerConnections.get(peerId);
+        if (!peerConnection) return;
+        
+        // Trigger renegotiation to refresh audio
+        try {
+            if (peerConnection.signalingState === 'stable' && this.localStream) {
+                // Re-add local tracks if missing
+                const senders = peerConnection.getSenders();
+                const localAudioTracks = this.localStream.getAudioTracks();
+                
+                if (senders.length === 0 && localAudioTracks.length > 0) {
+                    console.log(`🎤 Re-adding local audio tracks for ${peerId}`);
+                    localAudioTracks.forEach(track => {
+                        peerConnection.addTrack(track, this.localStream);
+                    });
+                    
+                    // Create new offer to renegotiate
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    await this.sendSignal(peerId, 'offer', offer);
+                    console.log(`🔄 Renegotiation offer sent to ${peerId} for audio recovery`);
+                }
+            }
+        } catch (error) {
+            console.error(`❌ Audio recovery failed for ${peerId}:`, error);
+        }
+    }
+    
+    // NEW: Validate audio after connection establishment
+    validateAudioAfterConnection(peerId) {
+        setTimeout(() => {
+            console.log(`🔍 Validating audio for ${peerId} after connection`);
+            
+            const remoteStream = this.remoteStreams.get(peerId);
+            if (remoteStream) {
+                const audioTracks = remoteStream.getAudioTracks();
+                if (audioTracks.length === 0) {
+                    console.warn(`⚠️ No audio tracks received from ${peerId}, requesting renegotiation`);
+                    this.requestAudioRenegotiation(peerId);
+                } else {
+                    audioTracks.forEach((track, index) => {
+                        console.log(`🎤 Audio track ${index} from ${peerId}: enabled=${track.enabled}, readyState=${track.readyState}, muted=${track.muted}`);
+                        
+                        if (track.readyState !== 'live') {
+                            console.warn(`⚠️ Audio track ${index} from ${peerId} not live: ${track.readyState}`);
+                        }
+                    });
+                }
+            } else {
+                console.warn(`⚠️ No remote stream received from ${peerId}`);
+            }
+            
+            // Check local audio transmission
+            const peerConnection = this.peerConnections.get(peerId);
+            if (peerConnection) {
+                const senders = peerConnection.getSenders();
+                const audioSenders = senders.filter(sender => 
+                    sender.track && sender.track.kind === 'audio'
+                );
+                
+                if (audioSenders.length === 0) {
+                    console.warn(`⚠️ No audio senders to ${peerId}, audio may not be transmitting`);
+                    this.ensureAudioTransmission(peerId);
+                } else {
+                    console.log(`✅ Audio transmission to ${peerId} validated: ${audioSenders.length} sender(s)`);
+                }
+            }
+        }, 2000); // Wait 2 seconds for stream establishment
+    }
+    
+    // NEW: Check audio stability during connection issues
+    checkAudioStability(peerId) {
+        console.log(`🔍 Checking audio stability for ${peerId}`);
+        
+        const remoteStream = this.remoteStreams.get(peerId);
+        if (remoteStream) {
+            const audioTracks = remoteStream.getAudioTracks();
+            let hasStableAudio = false;
+            
+            audioTracks.forEach((track, index) => {
+                if (track.readyState === 'live' && !track.muted) {
+                    hasStableAudio = true;
+                    console.log(`✅ Audio track ${index} from ${peerId} is stable`);
+                } else {
+                    console.warn(`⚠️ Audio track ${index} from ${peerId} unstable: readyState=${track.readyState}, muted=${track.muted}`);
+                }
+            });
+            
+            if (!hasStableAudio) {
+                console.log(`❌ No stable audio from ${peerId}, attempting recovery`);
+                this.attemptAudioRecovery(peerId);
             }
         } else {
-            console.log(`⚠️ No valid peer connection found for ${message.from} or no candidate data`);
+            console.warn(`⚠️ No remote stream from ${peerId} during stability check`);
+        }
+    }
+    
+    // NEW: Handle ICE connection failure
+    handleIceConnectionFailure(peerId) {
+        console.log(`🔄 Handling ICE connection failure for ${peerId}`);
+        
+        // Attempt ICE restart
+        const peerConnection = this.peerConnections.get(peerId);
+        if (peerConnection && peerConnection.restartIce) {
+            try {
+                console.log(`🔄 Attempting ICE restart for ${peerId}`);
+                peerConnection.restartIce();
+                
+                // Create new offer with ICE restart
+                if (this.peerId < peerId) {
+                    setTimeout(async () => {
+                        try {
+                            const offer = await peerConnection.createOffer({ iceRestart: true });
+                            await peerConnection.setLocalDescription(offer);
+                            await this.sendSignal(peerId, 'offer', offer);
+                            console.log(`✅ ICE restart offer sent to ${peerId}`);
+                        } catch (error) {
+                            console.error(`❌ Failed to create ICE restart offer for ${peerId}:`, error);
+                        }
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error(`❌ ICE restart failed for ${peerId}:`, error);
+            }
+        }
+    }
+    
+    // NEW: Attempt connection recovery
+    async attemptConnectionRecovery(peerId) {
+        console.log(`🔄 Attempting connection recovery for ${peerId}`);
+        
+        const peerConnection = this.peerConnections.get(peerId);
+        if (!peerConnection) {
+            console.log(`⚠️ No connection to recover for ${peerId}`);
+            return;
+        }
+        
+        // Try different recovery strategies based on connection state
+        switch (peerConnection.connectionState) {
+            case 'disconnected':
+                // Wait a bit more for automatic recovery
+                console.log(`⏳ Waiting for automatic recovery for ${peerId}`);
+                setTimeout(() => {
+                    if (peerConnection.connectionState === 'disconnected') {
+                        console.log(`🔄 Triggering manual reconnection for ${peerId}`);
+                        this.handleIceConnectionFailure(peerId);
+                    }
+                }, 3000);
+                break;
+                
+            case 'failed':
+                console.log(`🔄 Connection failed, recreating for ${peerId}`);
+                // Connection is already handled by connectionstatechange event
+                break;
+        }
+    }
+    
+    // NEW: Request audio renegotiation
+    async requestAudioRenegotiation(peerId) {
+        console.log(`🔄 Requesting audio renegotiation for ${peerId}`);
+        
+        const peerConnection = this.peerConnections.get(peerId);
+        if (!peerConnection || peerConnection.signalingState !== 'stable') {
+            console.log(`⚠️ Cannot renegotiate with ${peerId}: connection not stable`);
+            return;
+        }
+        
+        try {
+            // Ensure we have local audio
+            if (!this.localStream || this.localStream.getAudioTracks().length === 0) {
+                console.log(`🎤 Starting local audio for renegotiation with ${peerId}`);
+                await this.startAudio();
+            }
+            
+            // Check if we need to add tracks
+            const senders = peerConnection.getSenders();
+            const hasAudioSender = senders.some(sender => 
+                sender.track && sender.track.kind === 'audio'
+            );
+            
+            if (!hasAudioSender && this.localStream) {
+                console.log(`🎤 Adding local audio tracks for renegotiation with ${peerId}`);
+                this.localStream.getAudioTracks().forEach(track => {
+                    peerConnection.addTrack(track, this.localStream);
+                });
+            }
+            
+            // Create renegotiation offer
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            await this.sendSignal(peerId, 'offer', offer);
+            console.log(`✅ Audio renegotiation offer sent to ${peerId}`);
+            
+        } catch (error) {
+            console.error(`❌ Audio renegotiation failed for ${peerId}:`, error);
+        }
+    }
+    
+    // NEW: Ensure audio transmission to peer
+    async ensureAudioTransmission(peerId) {
+        console.log(`🔍 Ensuring audio transmission to ${peerId}`);
+        
+        const peerConnection = this.peerConnections.get(peerId);
+        if (!peerConnection) return;
+        
+        // Check if we have local audio
+        if (!this.localStream) {
+            console.log(`🎤 No local stream, starting audio for ${peerId}`);
+            try {
+                await this.startAudio();
+            } catch (error) {
+                console.error(`❌ Failed to start audio for ${peerId}:`, error);
+                return;
+            }
+        }
+        
+        const audioTracks = this.localStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+            console.warn(`⚠️ No local audio tracks available for ${peerId}`);
+            return;
+        }
+        
+        // Check senders
+        const senders = peerConnection.getSenders();
+        const audioSenders = senders.filter(sender => 
+            sender.track && sender.track.kind === 'audio'
+        );
+        
+        if (audioSenders.length === 0) {
+            console.log(`🎤 Adding audio tracks to existing connection with ${peerId}`);
+            try {
+                audioTracks.forEach(track => {
+                    peerConnection.addTrack(track, this.localStream);
+                });
+                
+                // Trigger renegotiation
+                await this.requestAudioRenegotiation(peerId);
+            } catch (error) {
+                console.error(`❌ Failed to add audio tracks to ${peerId}:`, error);
+            }
         }
     }
 
@@ -619,16 +1485,19 @@ class AudioConferenceClient {
         const peerConnection = new RTCPeerConnection(this.rtcConfig);
         this.peerConnections.set(peerId, peerConnection);
         
-        // Store connection version for validation
+        // Store connection version for validation (prevents 'Unknown ufrag' errors)
         peerConnection.connectionVersion = this.connectionVersion;
+        peerConnection.createdAt = Date.now();
+        
+        console.log(`🔢 Peer connection to ${peerId} created with version ${this.connectionVersion}`);
 
-        // Handle ICE candidates
+        // Handle ICE candidates with version validation
         peerConnection.onicecandidate = async (event) => {
             if (event.candidate && peerConnection.connectionVersion === this.connectionVersion) {
-                console.log(`🧊 Sending ICE candidate to ${peerId}`);
+                console.log(`🧊 Sending ICE candidate to ${peerId} (version: ${this.connectionVersion})`);
                 await this.sendSignal(peerId, 'ice-candidate', event.candidate);
             } else if (event.candidate) {
-                console.log(`⚠️ Ignoring stale ICE candidate for ${peerId} (version mismatch)`);
+                console.log(`⚠️ Ignoring stale ICE candidate for ${peerId} (connection version: ${peerConnection.connectionVersion}, current: ${this.connectionVersion})`);
             }
         };
 
@@ -636,28 +1505,157 @@ class AudioConferenceClient {
         peerConnection.ontrack = (event) => {
             console.log('🎵 Received remote stream from:', peerId);
             const remoteStream = event.streams[0];
+            
+            // Validate stream has tracks
+            const audioTracks = remoteStream.getAudioTracks();
+            console.log(`🔊 Remote stream from ${peerId}: ${audioTracks.length} audio tracks`);
+            
+            if (audioTracks.length === 0) {
+                console.warn(`⚠️ Remote stream from ${peerId} has no audio tracks`);
+            } else {
+                audioTracks.forEach((track, index) => {
+                    console.log(`🎤 Audio track ${index}: enabled=${track.enabled}, readyState=${track.readyState}`);
+                });
+            }
+            
             this.remoteStreams.set(peerId, remoteStream);
             this.updateRemoteParticipants();
         };
         
-        // Monitor connection state
+        // Enhanced connection state monitoring for audio stability
         peerConnection.onconnectionstatechange = () => {
             console.log(`🔗 Connection to ${peerId} state: ${peerConnection.connectionState}`);
             
-            if (peerConnection.connectionState === 'failed') {
-                console.log(`❌ Connection to ${peerId} failed, attempting reconnection`);
-                // Remove failed connection and let it be recreated on next offer
-                this.peerConnections.delete(peerId);
-                this.remoteStreams.delete(peerId);
-                this.updateRemoteParticipants();
+            switch (peerConnection.connectionState) {
+                case 'connected':
+                    console.log(`✅ Successfully connected to ${peerId}`);
+                    // Reset error counts on successful connection
+                    if (this.ufragErrorCounts) {
+                        this.ufragErrorCounts.delete(peerId);
+                    }
+                    // Process any queued candidates
+                    this.processQueuedCandidates(peerId);
+                    // Validate audio after connection
+                    this.validateAudioAfterConnection(peerId);
+                    break;
+                    
+                case 'disconnected':
+                    console.log(`⚠️ Connection to ${peerId} disconnected, monitoring for recovery`);
+                    // Monitor for automatic reconnection
+                    setTimeout(() => {
+                        if (peerConnection.connectionState === 'disconnected') {
+                            console.log(`🔄 Connection to ${peerId} still disconnected, attempting recovery`);
+                            this.attemptConnectionRecovery(peerId);
+                        }
+                    }, 5000);
+                    break;
+                    
+                case 'failed':
+                    console.log(`❌ Connection to ${peerId} failed, cleaning up and attempting reconnection`);
+                    // Clean up failed connection
+                    this.peerConnections.delete(peerId);
+                    this.remoteStreams.delete(peerId);
+                    if (this.queuedCandidates) {
+                        this.queuedCandidates.delete(peerId);
+                    }
+                    this.updateRemoteParticipants();
+                    
+                    // Attempt reconnection after delay
+                    setTimeout(() => {
+                        if (this.isConnected && this.peerId < peerId) {
+                            this.createOfferToPeer(peerId).catch(error => {
+                                console.error(`❌ Failed to reconnect to ${peerId}:`, error);
+                            });
+                        }
+                    }, 3000);
+                    break;
+                    
+                case 'connecting':
+                    console.log(`🔄 Connecting to ${peerId}...`);
+                    break;
+                    
+                case 'new':
+                    console.log(`🆕 New connection created for ${peerId}`);
+                    break;
+                    
+                case 'closed':
+                    console.log(`🔒 Connection to ${peerId} closed`);
+                    break;
+            }
+        };
+        
+        // Enhanced ICE connection state monitoring
+        peerConnection.oniceconnectionstatechange = () => {
+            console.log(`🧊 ICE connection to ${peerId} state: ${peerConnection.iceConnectionState}`);
+            
+            switch (peerConnection.iceConnectionState) {
+                case 'connected':
+                case 'completed':
+                    console.log(`✅ ICE connection to ${peerId} established successfully`);
+                    break;
+                    
+                case 'disconnected':
+                    console.log(`⚠️ ICE connection to ${peerId} disconnected`);
+                    // Monitor for recovery
+                    setTimeout(() => {
+                        if (peerConnection.iceConnectionState === 'disconnected') {
+                            console.log(`🔄 ICE still disconnected for ${peerId}, checking audio`);
+                            this.checkAudioStability(peerId);
+                        }
+                    }, 3000);
+                    break;
+                    
+                case 'failed':
+                    console.log(`❌ ICE connection to ${peerId} failed`);
+                    this.handleIceConnectionFailure(peerId);
+                    break;
+            }
+        };
+        
+        // Monitor ICE gathering state
+        peerConnection.onicegatheringstatechange = () => {
+            console.log(`📎 ICE gathering for ${peerId}: ${peerConnection.iceGatheringState}`);
+            
+            if (peerConnection.iceGatheringState === 'complete') {
+                console.log(`✅ ICE gathering completed for ${peerId}`);
+            }
+        };
+        
+        // Enhanced signaling state monitoring
+        peerConnection.onsignalingstatechange = () => {
+            console.log(`📡 Signaling state for ${peerId}: ${peerConnection.signalingState}`);
+            
+            if (peerConnection.signalingState === 'stable') {
+                console.log(`✅ Signaling stable for ${peerId}, processing queued candidates`);
+                this.processQueuedCandidates(peerId);
             }
         };
 
         // Add local stream if available
         if (this.localStream) {
             console.log(`🎵 Adding local audio tracks to connection with ${peerId}`);
-            this.localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, this.localStream);
+            const audioTracks = this.localStream.getAudioTracks();
+            
+            if (audioTracks.length === 0) {
+                console.warn(`⚠️ Local stream has no audio tracks when creating connection to ${peerId}`);
+                // Try to start audio if we don't have it
+                this.startAudio().catch(error => {
+                    console.error('❌ Failed to start audio for peer connection:', error);
+                });
+            } else {
+                audioTracks.forEach((track, index) => {
+                    console.log(`🎤 Adding local audio track ${index}: enabled=${track.enabled}, readyState=${track.readyState}`);
+                });
+                
+                this.localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, this.localStream);
+                });
+            }
+        } else {
+            console.warn(`⚠️ No local stream available when creating connection to ${peerId}`);
+            // Try to start audio
+            this.startAudio().catch(error => {
+                console.error('❌ Failed to start audio for peer connection:', error);
             });
         }
 
@@ -666,16 +1664,45 @@ class AudioConferenceClient {
 
     async createOfferToPeer(peerId) {
         try {
+            // Validate that we have audio tracks before creating offer
+            if (!this.localStream || this.localStream.getTracks().length === 0) {
+                console.log('🎤 No audio tracks available, starting audio before creating offer');
+                try {
+                    await this.startAudio();
+                } catch (error) {
+                    console.error('❌ Failed to start audio for offer creation:', error);
+                    // Continue without audio - peer connection still possible
+                }
+            }
+            
             const peerConnection = await this.createPeerConnection(peerId);
+            
+            // Double-check connection state before creating offer
+            if (peerConnection.signalingState !== 'stable') {
+                console.log(`⚠️ Peer connection to ${peerId} not in stable state (${peerConnection.signalingState}), waiting...`);
+                // Wait a bit and retry
+                await new Promise(resolve => setTimeout(resolve, 100));
+                if (peerConnection.signalingState !== 'stable') {
+                    console.log(`❌ Peer connection to ${peerId} still not stable, skipping offer creation`);
+                    return;
+                }
+            }
             
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
             
             await this.sendSignal(peerId, 'offer', offer);
-            console.log('Sent offer to peer:', peerId);
+            console.log('📤 Sent offer to peer:', peerId);
             
         } catch (error) {
-            console.error('Create offer error:', error);
+            console.error('❌ Create offer error:', error);
+            
+            // If offer creation fails, try to recover the connection
+            if (this.peerConnections.has(peerId)) {
+                console.log('🔄 Removing failed connection, will retry on next attempt');
+                this.peerConnections.get(peerId).close();
+                this.peerConnections.delete(peerId);
+            }
         }
     }
 
@@ -720,7 +1747,7 @@ class AudioConferenceClient {
             this.localAudio.srcObject = this.localStream;
             
             // Replace audio tracks in all existing peer connections
-            this.peerConnections.forEach((pc, peerId) => {
+            this.peerConnections.forEach(async (pc, peerId) => {
                 console.log(`🔄 Updating audio tracks for peer: ${peerId}`);
                 
                 // Remove existing audio tracks
@@ -733,18 +1760,101 @@ class AudioConferenceClient {
                 
                 // Add new audio tracks
                 this.localStream.getTracks().forEach(track => {
+                    console.log(`🎤 Adding track: ${track.kind} (enabled: ${track.enabled}, readyState: ${track.readyState})`);
                     pc.addTrack(track, this.localStream);
                 });
+                
+                // Trigger renegotiation if we're the offerer (lexicographically smaller peer ID)
+                if (this.peerId < peerId && pc.signalingState === 'stable') {
+                    try {
+                        console.log(`🔄 Triggering renegotiation for ${peerId}`);
+                        const offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        await this.sendSignal(peerId, 'offer', offer);
+                        console.log(`✅ Renegotiation offer sent to ${peerId}`);
+                    } catch (error) {
+                        console.error(`❌ Renegotiation failed for ${peerId}:`, error);
+                    }
+                }
             });
             
             this.updateLocalParticipant();
             this.showMessage('Audio started - you can now speak', 'success');
             console.log('✅ Audio capture started successfully');
+            
+            // Validate audio tracks
+            this.validateAudioTracks();
         } catch (error) {
             console.error('Error accessing microphone:', error);
             this.showMessage('Failed to access microphone: ' + error.message, 'error');
+            this.diagnoseAudioProblem(error);
         }
         this.updateUI();
+    }
+    
+    validateAudioTracks() {
+        if (!this.localStream) {
+            console.error('❌ No local stream available');
+            return false;
+        }
+        
+        const audioTracks = this.localStream.getAudioTracks();
+        console.log(`🔊 Local stream validation: ${audioTracks.length} audio tracks`);
+        
+        if (audioTracks.length === 0) {
+            console.error('❌ Local stream has no audio tracks');
+            return false;
+        }
+        
+        audioTracks.forEach((track, index) => {
+            console.log(`🎤 Local audio track ${index}:`);
+            console.log(`  - Label: ${track.label}`);
+            console.log(`  - Enabled: ${track.enabled}`);
+            console.log(`  - Ready State: ${track.readyState}`);
+            console.log(`  - Muted: ${track.muted}`);
+            
+            if (track.readyState !== 'live') {
+                console.warn(`⚠️ Audio track ${index} is not live: ${track.readyState}`);
+            }
+        });
+        
+        return true;
+    }
+    
+    diagnoseAudioProblem(error) {
+        console.log('🔍 Diagnosing audio problem...');
+        
+        const diagnosis = [];
+        
+        // Check error type
+        if (error.name === 'NotAllowedError') {
+            diagnosis.push('❌ Microphone permission denied');
+            diagnosis.push('💡 Solution: Allow microphone access in browser settings');
+        } else if (error.name === 'NotFoundError') {
+            diagnosis.push('❌ No microphone device found');
+            diagnosis.push('💡 Solution: Connect a microphone and refresh the page');
+        } else if (error.name === 'NotReadableError') {
+            diagnosis.push('❌ Microphone is being used by another application');
+            diagnosis.push('💡 Solution: Close other applications using the microphone');
+        } else {
+            diagnosis.push(`❌ Audio error: ${error.name} - ${error.message}`);
+        }
+        
+        // Check HTTPS requirement
+        if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+            diagnosis.push('⚠️ HTTPS required for microphone access');
+            diagnosis.push('💡 Solution: Access via HTTPS or localhost');
+        }
+        
+        // Display diagnosis
+        console.log('🔍 Audio Diagnosis:');
+        diagnosis.forEach(item => console.log(`  ${item}`));
+        
+        // Show user-friendly message
+        const problemMsg = diagnosis.join('\n');
+        setTimeout(() => {
+            alert(`Audio Problem Detected:\n\n${problemMsg}`);
+        }, 1000);
     }
 
     stopAudio() {
@@ -863,20 +1973,79 @@ class AudioConferenceClient {
         
         // Add current remote participants
         this.remoteStreams.forEach((stream, peerId) => {
+            console.log(`🎵 Creating UI for remote peer: ${peerId}, stream tracks:`, stream.getTracks().length);
+            
             const participantDiv = document.createElement('div');
             participantDiv.className = 'participant connected';
+            
+            // Check if stream has audio tracks
+            const audioTracks = stream.getAudioTracks();
+            const hasAudio = audioTracks.length > 0;
+            const isAudioEnabled = hasAudio && audioTracks[0].enabled;
+            
+            console.log(`🔊 Peer ${peerId} audio status: ${hasAudio ? 'has audio' : 'no audio'}, enabled: ${isAudioEnabled}`);
+            
             participantDiv.innerHTML = `
-                <div class="participant-avatar">🎤</div>
+                <div class="participant-avatar">${hasAudio ? '🎤' : '🔇'}</div>
                 <div class="participant-name">${peerId.split('_')[1] || 'Peer'}</div>
-                <div class="participant-status">Connected</div>
+                <div class="participant-status">${hasAudio && isAudioEnabled ? 'Connected' : 'No Audio'}</div>
                 <audio autoplay></audio>
             `;
             
             const audio = participantDiv.querySelector('audio');
             audio.srcObject = stream;
             
+            // Add audio level monitoring
+            if (hasAudio) {
+                this.monitorAudioLevel(audio, participantDiv);
+            }
+            
             this.participantsGrid.appendChild(participantDiv);
         });
+        
+        console.log(`👥 Updated UI: ${this.remoteStreams.size} remote participants displayed`);
+    }
+    
+    monitorAudioLevel(audioElement, participantDiv) {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaElementSource(audioElement);
+            const analyser = audioContext.createAnalyser();
+            
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            analyser.fftSize = 256;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            const statusElement = participantDiv.querySelector('.participant-status');
+            
+            const checkAudioLevel = () => {
+                analyser.getByteFrequencyData(dataArray);
+                const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+                
+                if (average > 10) {
+                    statusElement.textContent = 'Speaking';
+                    participantDiv.className = 'participant connected speaking';
+                } else {
+                    statusElement.textContent = 'Connected';
+                    participantDiv.className = 'participant connected';
+                }
+                
+                requestAnimationFrame(checkAudioLevel);
+            };
+            
+            // Start monitoring after a short delay to ensure audio is ready
+            setTimeout(() => {
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+                checkAudioLevel();
+            }, 1000);
+            
+        } catch (error) {
+            console.log('🔊 Audio monitoring not available:', error.message);
+        }
     }
 
     clearRemoteParticipants() {

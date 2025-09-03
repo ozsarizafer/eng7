@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENG7 Performance Monitor</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #64b5f6;
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+        
+        .stat-description {
+            font-size: 0.9em;
+            opacity: 0.8;
+            text-align: center;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            background: linear-gradient(45deg, #4caf50, #45a049);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1em;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .btn.danger {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+        }
+        
+        .btn.warning {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+        }
+        
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .log-timestamp {
+            color: #90caf9;
+            font-weight: bold;
+        }
+        
+        .log-info { color: #4caf50; }
+        .log-warning { color: #ff9800; }
+        .log-error { color: #f44336; }
+        
+        .performance-indicators {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .indicator {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .indicator.good { border-left: 5px solid #4caf50; }
+        .indicator.warning { border-left: 5px solid #ff9800; }
+        .indicator.critical { border-left: 5px solid #f44336; }
+        
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        input[type="checkbox"] {
+            transform: scale(1.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ENG7 Performance Monitor</h1>
+        
+        <div class="auto-refresh">
+            <input type="checkbox" id="autoRefresh" checked>
+            <label for="autoRefresh">Auto-refresh every 5 seconds</label>
+        </div>
+        
+        <div class="controls">
+            <button class="btn" onclick="refreshStats()">🔄 Refresh Stats</button>
+            <button class="btn warning" onclick="forceCleanup()">🧹 Force Cleanup</button>
+            <button class="btn danger" onclick="resetDatabase()">💥 Reset Database</button>
+            <button class="btn" onclick="clearLog()">🗑️ Clear Log</button>
+        </div>
+        
+        <div class="performance-indicators" id="indicators">
+            <!-- Performance indicators will be populated here -->
+        </div>
+        
+        <div class="stats-grid" id="statsGrid">
+            <!-- Stats cards will be populated here -->
+        </div>
+        
+        <div class="log-container">
+            <h3>📋 Activity Log</h3>
+            <div id="activityLog"></div>
+        </div>
+    </div>
+
+    <script>
+        let refreshInterval;
+        let logEntries = [];
+        
+        // Initialize the monitor
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStats();
+            startAutoRefresh();
+            
+            // Setup auto-refresh toggle
+            document.getElementById('autoRefresh').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    startAutoRefresh();
+                } else {
+                    stopAutoRefresh();
+                }
+            });
+        });
+        
+        function startAutoRefresh() {
+            refreshInterval = setInterval(refreshStats, 5000);
+            log('Auto-refresh started (every 5 seconds)', 'info');
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+                log('Auto-refresh stopped', 'info');
+            }
+        }
+        
+        async function refreshStats() {
+            try {
+                const response = await fetch('public/api.php?action=stats');
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateStatsDisplay(result.data.stats);
+                    updatePerformanceIndicators(result.data.stats);
+                    log('Statistics refreshed successfully', 'info');
+                } else {
+                    log('Failed to get stats: ' + result.error, 'error');
+                }
+            } catch (error) {
+                log('Error fetching stats: ' + error.message, 'error');
+            }
+        }
+        
+        function updateStatsDisplay(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-title">🏠 Active Rooms</div>
+                    <div class="stat-value">${stats.active_rooms}</div>
+                    <div class="stat-description">Rooms with participants</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-title">👥 Active Peers</div>
+                    <div class="stat-value">${stats.active_peers}</div>
+                    <div class="stat-description">Connected participants</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-title">📊 Total Rooms</div>
+                    <div class="stat-value">${stats.total_rooms}</div>
+                    <div class="stat-description">All rooms in database</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-title">📈 Total Peers</div>
+                    <div class="stat-value">${stats.total_peers}</div>
+                    <div class="stat-description">All peer records</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-title">💌 Unprocessed Messages</div>
+                    <div class="stat-value">${stats.unprocessed_messages}</div>
+                    <div class="stat-description">Pending signaling messages</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-title">📨 Total Messages</div>
+                    <div class="stat-value">${stats.total_messages}</div>
+                    <div class="stat-description">All signaling messages</div>
+                </div>
+            `;
+        }
+        
+        function updatePerformanceIndicators(stats) {
+            const indicators = document.getElementById('indicators');
+            
+            // Calculate performance indicators
+            const ghostRooms = stats.total_rooms - stats.active_rooms;
+            const ghostPeers = stats.total_peers - stats.active_peers;
+            const messageBacklog = stats.unprocessed_messages;
+            
+            // Determine status classes
+            const ghostRoomStatus = ghostRooms === 0 ? 'good' : (ghostRooms < 5 ? 'warning' : 'critical');
+            const ghostPeerStatus = ghostPeers === 0 ? 'good' : (ghostPeers < 10 ? 'warning' : 'critical');
+            const messageStatus = messageBacklog < 50 ? 'good' : (messageBacklog < 200 ? 'warning' : 'critical');
+            
+            indicators.innerHTML = `
+                <div class="indicator ${ghostRoomStatus}">
+                    <div style="font-size: 1.5em; font-weight: bold;">${ghostRooms}</div>
+                    <div>Ghost Rooms</div>
+                </div>
+                
+                <div class="indicator ${ghostPeerStatus}">
+                    <div style="font-size: 1.5em; font-weight: bold;">${ghostPeers}</div>
+                    <div>Inactive Peers</div>
+                </div>
+                
+                <div class="indicator ${messageStatus}">
+                    <div style="font-size: 1.5em; font-weight: bold;">${messageBacklog}</div>
+                    <div>Message Backlog</div>
+                </div>
+                
+                <div class="indicator good">
+                    <div style="font-size: 1.5em; font-weight: bold;">${((stats.active_peers / Math.max(stats.total_peers, 1)) * 100).toFixed(1)}%</div>
+                    <div>Active Ratio</div>
+                </div>
+            `;
+        }
+        
+        async function forceCleanup() {
+            try {
+                log('Starting force cleanup...', 'info');
+                const response = await fetch('public/api.php?action=cleanup');
+                const result = await response.json();
+                
+                if (result.success) {
+                    log(`Cleanup completed: ${result.data.inactive_peers_removed} peers, ${result.data.old_messages_removed} messages, ${result.data.empty_rooms_removed} rooms`, 'info');
+                    setTimeout(refreshStats, 1000); // Refresh after cleanup
+                } else {
+                    log('Cleanup failed: ' + result.error, 'error');
+                }
+            } catch (error) {
+                log('Error during cleanup: ' + error.message, 'error');
+            }
+        }
+        
+        async function resetDatabase() {
+            if (!confirm('Are you sure you want to reset the entire database? This will remove all rooms, peers, and messages.')) {
+                return;
+            }
+            
+            try {
+                log('Resetting database...', 'warning');
+                const response = await fetch('setup_db.php');
+                const result = await response.text();
+                
+                log('Database reset completed', 'info');
+                setTimeout(refreshStats, 1000); // Refresh after reset
+            } catch (error) {
+                log('Error resetting database: ' + error.message, 'error');
+            }
+        }
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = {
+                timestamp,
+                message,
+                type
+            };
+            
+            logEntries.unshift(entry);
+            
+            // Keep only last 100 entries
+            if (logEntries.length > 100) {
+                logEntries = logEntries.slice(0, 100);
+            }
+            
+            updateLogDisplay();
+        }
+        
+        function updateLogDisplay() {
+            const logContainer = document.getElementById('activityLog');
+            
+            logContainer.innerHTML = logEntries.map(entry => `
+                <div class="log-entry">
+                    <span class="log-timestamp">[${entry.timestamp}]</span>
+                    <span class="log-${entry.type}">${entry.message}</span>
+                </div>
+            `).join('');
+        }
+        
+        function clearLog() {
+            logEntries = [];
+            updateLogDisplay();
+            log('Log cleared', 'info');
+        }
+        
+        // Log initial message
+        log('Performance monitor initialized', 'info');
+    </script>
+</body>
+</html>

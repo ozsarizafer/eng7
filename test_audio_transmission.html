@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transmission Debug - WebRTC Conference</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .log-output {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        .step {
+            background: #e9ecef;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .diagnosis {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔊 Audio Transmission Debug Tool</h1>
+        <p class="info">This tool helps diagnose why audio transmission is not working ("ses aktarımı olmuyor").</p>
+        
+        <div class="test-section">
+            <h3>🛠️ Recent Audio Fixes Applied</h3>
+            <ul>
+                <li>✅ <strong>Enhanced Peer Join Handling:</strong> Automatically start audio when new peers join</li>
+                <li>✅ <strong>Track Validation:</strong> Ensure audio tracks are present before creating offers</li>
+                <li>✅ <strong>Renegotiation Support:</strong> Automatically renegotiate when audio tracks are added</li>
+                <li>✅ <strong>Better Logging:</strong> Detailed audio track debugging information</li>
+                <li>✅ <strong>Stream Monitoring:</strong> Real-time audio stream status in participant display</li>
+                <li>✅ <strong>Error Recovery:</strong> Attempt to start audio if missing during offer handling</li>
+            </ul>
+        </div>
+        
+        <div class="test-section">
+            <h3>📋 Step-by-Step Testing</h3>
+            
+            <div class="step">
+                <strong>Step 1:</strong> Open two browser tabs with the audio conference<br>
+                <button onclick="window.open('public/index.html', '_blank')">🆕 Open Tab 1</button>
+                <button onclick="window.open('public/index.html', '_blank')">🆕 Open Tab 2</button>
+            </div>
+            
+            <div class="step">
+                <strong>Step 2:</strong> In Tab 1, create a new room and join it
+                <div class="diagnosis">
+                    <strong>What to check:</strong> Console should show "🎵 Starting audio capture..." and "✅ Audio capture started successfully"
+                </div>
+            </div>
+            
+            <div class="step">
+                <strong>Step 3:</strong> In Tab 2, join the same room
+                <div class="diagnosis">
+                    <strong>What to check:</strong> 
+                    <ul>
+                        <li>Tab 1 console: "📤 Sent offer to peer: [peer_id]"</li>
+                        <li>Tab 2 console: "🎵 No local audio stream when handling offer - starting audio"</li>
+                        <li>Both tabs: "🎵 Received remote stream from: [peer_id]"</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="step">
+                <strong>Step 4:</strong> Check participant status in both tabs
+                <div class="diagnosis">
+                    <strong>Expected:</strong> Remote participants should show "Connected" or "Speaking" status, not "No Audio"
+                </div>
+            </div>
+            
+            <div class="step">
+                <strong>Step 5:</strong> Test audio by speaking in one tab
+                <div class="diagnosis">
+                    <strong>Expected:</strong> Audio should be heard in the other tab with minimal delay
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🔍 Real-Time Audio Monitoring</h3>
+            <button onclick="startAudioMonitoring()">▶️ Start Monitoring</button>
+            <button onclick="stopAudioMonitoring()">⏹️ Stop Monitoring</button>
+            <button onclick="clearLog()">🧹 Clear Log</button>
+            
+            <div id="logOutput" class="log-output">Click "Start Monitoring" to begin audio transmission monitoring...</div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Audio Troubleshooting</h3>
+            <button onclick="testMicrophoneAccess()">🎤 Test Microphone Access</button>
+            <button onclick="checkWebRTCSupport()">🔧 Check WebRTC Support</button>
+            <button onclick="testPeerConnections()">🔗 Test Peer Connections</button>
+            <div id="troubleshootResults"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>❌ Common Issues & Solutions</h3>
+            <div class="diagnosis">
+                <h4>Issue: "No Audio" status for remote participants</h4>
+                <ul>
+                    <li><strong>Cause:</strong> Audio tracks not properly added to peer connections</li>
+                    <li><strong>Solution:</strong> Fixed in handlePeerJoined() to automatically start audio</li>
+                    <li><strong>Check:</strong> Console should show "🎵 Adding track: audio (enabled: true)"</li>
+                </ul>
+            </div>
+            
+            <div class="diagnosis">
+                <h4>Issue: Audio works initially but stops after peer joins</h4>
+                <ul>
+                    <li><strong>Cause:</strong> Track renegotiation not triggered properly</li>
+                    <li><strong>Solution:</strong> Added automatic renegotiation in startAudio()</li>
+                    <li><strong>Check:</strong> Console should show "🔄 Triggering renegotiation for [peer_id]"</li>
+                </ul>
+            </div>
+            
+            <div class="diagnosis">
+                <h4>Issue: ICE connection fails</h4>
+                <ul>
+                    <li><strong>Cause:</strong> TURN server issues or firewall blocking</li>
+                    <li><strong>Solution:</strong> Added multiple TURN servers in WebRTC config</li>
+                    <li><strong>Check:</strong> Console should show "✅ Successfully connected to [peer_id]"</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let monitoringInterval;
+        let isMonitoring = false;
+        
+        function log(message, type = 'info') {
+            const logOutput = document.getElementById('logOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const colorClass = type === 'success' ? '#00ff00' : 
+                              type === 'error' ? '#ff4444' : 
+                              type === 'warning' ? '#ffaa00' : '#00ffff';
+            
+            logOutput.innerHTML += `<span style="color: ${colorClass}">[${timestamp}] ${message}</span>\n`;
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+        
+        async function startAudioMonitoring() {
+            if (isMonitoring) return;
+            
+            isMonitoring = true;
+            document.querySelector('button[onclick="startAudioMonitoring()"]').disabled = true;
+            document.querySelector('button[onclick="stopAudioMonitoring()"]').disabled = false;
+            
+            log('🔄 Starting audio transmission monitoring...', 'info');
+            
+            monitoringInterval = setInterval(async () => {
+                try {
+                    // Check room list and participants
+                    const roomResponse = await fetch('public/api.php?action=list_rooms');
+                    const roomResult = await roomResponse.json();
+                    
+                    if (roomResult.success) {
+                        const rooms = roomResult.data.rooms;
+                        
+                        if (rooms.length === 0) {
+                            log('🏠 No active rooms for audio testing', 'info');
+                        } else {
+                            for (const room of rooms) {
+                                // Get detailed peer information
+                                const peerResponse = await fetch(`public/api.php?action=peers&roomId=${room.room_id}`);
+                                const peerResult = await peerResponse.json();
+                                
+                                if (peerResult.success) {
+                                    const peers = peerResult.data.peers;
+                                    
+                                    if (peers.length >= 2) {\n                                        log(`🎵 Audio room detected: ${room.room_id.split('_')[0]} with ${peers.length} participants`, 'success');\n                                        log(`👥 Participants: ${peers.map(p => p.username || p.peer_id.split('_')[1]).join(', ')}`, 'info');\n                                        \n                                        // This is where audio transmission should be happening\n                                        log('🔍 Check browser console for WebRTC audio logs:', 'warning');\n                                        log('   - \"🎵 Adding local audio tracks\"', 'warning');\n                                        log('   - \"🎵 Received remote stream\"', 'warning');\n                                        log('   - \"✅ Successfully connected to [peer]\"', 'warning');\n                                    } else if (peers.length === 1) {\n                                        log(`👤 Single user in room ${room.room_id.split('_')[0]} - waiting for second participant`, 'info');\n                                    }\n                                }\n                            }\n                        }\n                    }\n                } catch (error) {\n                    log(`❌ Monitoring error: ${error.message}`, 'error');\n                }\n            }, 3000);\n        }\n        \n        function stopAudioMonitoring() {\n            if (!isMonitoring) return;\n            \n            isMonitoring = false;\n            clearInterval(monitoringInterval);\n            \n            document.querySelector('button[onclick=\"startAudioMonitoring()\"]').disabled = false;\n            document.querySelector('button[onclick=\"stopAudioMonitoring()\"]').disabled = true;\n            \n            log('⏹️ Audio monitoring stopped', 'warning');\n        }\n        \n        function clearLog() {\n            document.getElementById('logOutput').innerHTML = '';\n        }\n        \n        async function testMicrophoneAccess() {\n            const resultsDiv = document.getElementById('troubleshootResults');\n            resultsDiv.innerHTML = '<p>🎤 Testing microphone access...</p>';\n            \n            try {\n                const stream = await navigator.mediaDevices.getUserMedia({ \n                    audio: {\n                        echoCancellation: true,\n                        noiseSuppression: true,\n                        autoGainControl: true\n                    }\n                });\n                \n                const tracks = stream.getAudioTracks();\n                let results = '<h4>🎤 Microphone Test Results:</h4>';\n                results += `<p class=\"success\">✅ Microphone access granted</p>`;\n                results += `<p>📊 Audio tracks: ${tracks.length}</p>`;\n                \n                tracks.forEach((track, index) => {\n                    results += `<p>🎵 Track ${index + 1}: ${track.label || 'Default'} (enabled: ${track.enabled})</p>`;\n                });\n                \n                // Clean up\n                stream.getTracks().forEach(track => track.stop());\n                \n                results += '<p class=\"success\">✅ Microphone test completed successfully</p>';\n                resultsDiv.innerHTML = results;\n                \n            } catch (error) {\n                resultsDiv.innerHTML = `<p class=\"error\">❌ Microphone test failed: ${error.message}</p>`;\n                if (error.name === 'NotAllowedError') {\n                    resultsDiv.innerHTML += '<p class=\"warning\">⚠️ Please allow microphone access in browser settings</p>';\n                }\n            }\n        }\n        \n        function checkWebRTCSupport() {\n            const resultsDiv = document.getElementById('troubleshootResults');\n            \n            let results = '<h4>🔧 WebRTC Support Check:</h4>';\n            \n            if (typeof RTCPeerConnection !== 'undefined') {\n                results += '<p class=\"success\">✅ RTCPeerConnection supported</p>';\n            } else {\n                results += '<p class=\"error\">❌ RTCPeerConnection not supported</p>';\n            }\n            \n            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {\n                results += '<p class=\"success\">✅ getUserMedia supported</p>';\n            } else {\n                results += '<p class=\"error\">❌ getUserMedia not supported</p>';\n            }\n            \n            if (typeof EventSource !== 'undefined') {\n                results += '<p class=\"success\">✅ Server-Sent Events supported</p>';\n            } else {\n                results += '<p class=\"error\">❌ Server-Sent Events not supported</p>';\n            }\n            \n            // Check for HTTPS\n            if (location.protocol === 'https:' || location.hostname === 'localhost') {\n                results += '<p class=\"success\">✅ Secure context (HTTPS or localhost)</p>';\n            } else {\n                results += '<p class=\"warning\">⚠️ Not a secure context - microphone may be blocked</p>';\n            }\n            \n            resultsDiv.innerHTML = results;\n        }\n        \n        async function testPeerConnections() {\n            const resultsDiv = document.getElementById('troubleshootResults');\n            resultsDiv.innerHTML = '<p>🔗 Testing peer connection capability...</p>';\n            \n            try {\n                // Test basic peer connection creation\n                const config = {\n                    iceServers: [\n                        { urls: 'stun:stun.l.google.com:19302' },\n                        {\n                            urls: 'turn:openrelay.metered.ca:80',\n                            username: 'openrelayproject',\n                            credential: 'openrelayproject'\n                        }\n                    ]\n                };\n                \n                const pc = new RTCPeerConnection(config);\n                \n                let results = '<h4>🔗 Peer Connection Test Results:</h4>';\n                results += '<p class=\"success\">✅ Peer connection created successfully</p>';\n                results += `<p>📊 ICE gathering state: ${pc.iceGatheringState}</p>`;\n                results += `<p>📊 Signaling state: ${pc.signalingState}</p>`;\n                \n                // Test data channel creation\n                const dc = pc.createDataChannel('test');\n                results += '<p class=\"success\">✅ Data channel created</p>';\n                \n                // Test offer creation\n                const offer = await pc.createOffer();\n                results += '<p class=\"success\">✅ Offer creation successful</p>';\n                \n                await pc.setLocalDescription(offer);\n                results += '<p class=\"success\">✅ Local description set</p>';\n                \n                // Clean up\n                pc.close();\n                \n                results += '<p class=\"success\">✅ Peer connection test completed</p>';\n                resultsDiv.innerHTML = results;\n                \n            } catch (error) {\n                resultsDiv.innerHTML = `<p class=\"error\">❌ Peer connection test failed: ${error.message}</p>`;\n            }\n        }\n        \n        // Auto-clear log on page load\n        window.addEventListener('load', () => {\n            clearLog();\n            log('🚀 Audio transmission debug tool loaded', 'success');\n            log('💡 Apply the recent fixes and test audio transmission', 'info');\n            log('📝 Check browser console for detailed WebRTC logs', 'info');\n        });\n    </script>\n</body>\n</html>

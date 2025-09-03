@@ -68,20 +68,44 @@ class Signal {
                 throw new Exception("Room does not exist: $roomId");
             }
 
-            // Remove any existing peer connection
+            // Remove any existing peer connection with proper foreign key handling
             $this->leavePeer($peerId);
+            
+            // Small delay to ensure cleanup is complete
+            usleep(100000); // 100ms delay
 
             // Add new peer to room using the confirmed room_id
             $sql = "INSERT INTO peers (peer_id, room_id, username) VALUES (?, ?, ?)";
             return $this->db->query($sql, [$peerId, $room['room_id'], $username]);
         } catch (Exception $e) {
+            error_log("Error in joinRoom for peer $peerId in room $roomId: " . $e->getMessage());
             throw $e;
         }
     }
 
     public function leavePeer($peerId) {
-        $sql = "DELETE FROM peers WHERE peer_id = ?";
-        return $this->db->query($sql, [$peerId]);
+        // Temporarily disable foreign key checks for safe peer removal
+        $this->db->query("PRAGMA foreign_keys = OFF");
+        
+        try {
+            // Delete signaling messages related to this peer first (child records)
+            $sql = "DELETE FROM signaling_messages WHERE from_peer_id = ? OR to_peer_id = ?";
+            $this->db->query($sql, [$peerId, $peerId]);
+            
+            // Then delete the peer record (parent record)
+            $sql = "DELETE FROM peers WHERE peer_id = ?";
+            $result = $this->db->query($sql, [$peerId]);
+            
+            // Re-enable foreign key checks
+            $this->db->query("PRAGMA foreign_keys = ON");
+            
+            return $result;
+        } catch (Exception $e) {
+            // Re-enable foreign key checks in case of error
+            $this->db->query("PRAGMA foreign_keys = ON");
+            error_log("Error in leavePeer for peer $peerId: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function getRoomPeers($roomId) {
@@ -239,6 +263,83 @@ class Signal {
             return $deletedCount;
         } catch (Exception $e) {
             // Re-enable foreign key checks in case of error
+            $this->db->query("PRAGMA foreign_keys = ON");
+            throw $e;
+        }
+    }
+    
+    public function getSystemStats() {
+        // Get comprehensive system statistics for monitoring
+        $stats = [];
+        
+        // Room statistics
+        $sql = "SELECT COUNT(*) as total_rooms FROM rooms";
+        $stmt = $this->db->query($sql);
+        $stats['total_rooms'] = $stmt->fetch()['total_rooms'];
+        
+        // Active rooms (with participants)
+        $sql = "SELECT COUNT(DISTINCT r.room_id) as active_rooms FROM rooms r 
+                WHERE EXISTS (
+                    SELECT 1 FROM peers p 
+                    WHERE p.room_id = r.room_id AND p.is_connected = 1
+                    AND p.last_seen >= datetime('now', '-1 minute')
+                )";
+        $stmt = $this->db->query($sql);
+        $stats['active_rooms'] = $stmt->fetch()['active_rooms'];
+        
+        // Peer statistics
+        $sql = "SELECT COUNT(*) as total_peers FROM peers";
+        $stmt = $this->db->query($sql);
+        $stats['total_peers'] = $stmt->fetch()['total_peers'];
+        
+        // Active peers
+        $sql = "SELECT COUNT(*) as active_peers FROM peers 
+                WHERE is_connected = 1 AND last_seen >= datetime('now', '-1 minute')";
+        $stmt = $this->db->query($sql);
+        $stats['active_peers'] = $stmt->fetch()['active_peers'];
+        
+        // Message statistics
+        $sql = "SELECT COUNT(*) as total_messages FROM signaling_messages";
+        $stmt = $this->db->query($sql);
+        $stats['total_messages'] = $stmt->fetch()['total_messages'];
+        
+        // Unprocessed messages
+        $sql = "SELECT COUNT(*) as unprocessed_messages FROM signaling_messages WHERE processed = 0";
+        $stmt = $this->db->query($sql);
+        $stats['unprocessed_messages'] = $stmt->fetch()['unprocessed_messages'];
+        
+        return $stats;
+    }
+    
+    public function bulkCleanupInactivePeers($thresholdMinutes = 1) {
+        // More efficient bulk cleanup for performance
+        $this->db->query("PRAGMA foreign_keys = OFF");
+        
+        try {
+            // Get list of inactive peers
+            $sql = "SELECT peer_id FROM peers WHERE 
+                    last_seen < datetime('now', '-' || ? || ' minutes')";
+            $stmt = $this->db->query($sql, [$thresholdMinutes]);
+            $inactivePeers = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            if (empty($inactivePeers)) {
+                $this->db->query("PRAGMA foreign_keys = ON");
+                return 0;
+            }
+            
+            // Bulk delete signaling messages
+            $placeholders = str_repeat('?,', count($inactivePeers) - 1) . '?';
+            $sql = "DELETE FROM signaling_messages WHERE from_peer_id IN ($placeholders) OR to_peer_id IN ($placeholders)";
+            $this->db->query($sql, array_merge($inactivePeers, $inactivePeers));
+            
+            // Bulk delete peers
+            $sql = "DELETE FROM peers WHERE peer_id IN ($placeholders)";
+            $this->db->query($sql, $inactivePeers);
+            
+            $this->db->query("PRAGMA foreign_keys = ON");
+            
+            return count($inactivePeers);
+        } catch (Exception $e) {
             $this->db->query("PRAGMA foreign_keys = ON");
             throw $e;
         }

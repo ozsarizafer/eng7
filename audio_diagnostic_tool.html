@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔊 Audio Transmission Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        .diagnostic-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #007bff;
+        }
+
+        .error-section {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .success-section {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+
+        .warning-section {
+            border-left-color: #ffc107;
+            background: #fffbf0;
+        }
+
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .btn.success {
+            background: #28a745;
+        }
+
+        .btn.success:hover {
+            background: #1e7e34;
+        }
+
+        .btn.danger {
+            background: #dc3545;
+        }
+
+        .btn.danger:hover {
+            background: #c82333;
+        }
+
+        .log-container {
+            background: #212529;
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-success { background-color: #28a745; }
+        .status-error { background-color: #dc3545; }
+        .status-warning { background-color: #ffc107; }
+        .status-info { background-color: #17a2b8; }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .checklist li:last-child {
+            border-bottom: none;
+        }
+
+        .step-number {
+            background: #007bff;
+            color: white;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .fixes-applied {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .fixes-applied h4 {
+            color: #155724;
+            margin-top: 0;
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔊 Audio Transmission Diagnostic Tool</h1>
+        <p class="subtitle">Complete solution for "ses iletmiyor" (audio not transmitting) issues</p>
+
+        <div class="fixes-applied">
+            <h4>✅ Recent Audio Transmission Fixes</h4>
+            <ul>
+                <li><strong>Enhanced Stream Validation:</strong> Validates audio tracks before transmission</li>
+                <li><strong>Real-time Audio Monitoring:</strong> Shows speaking status and audio levels</li>
+                <li><strong>Automatic Audio Recovery:</strong> Restarts audio if missing during connections</li>
+                <li><strong>Enhanced Error Diagnostics:</strong> Detailed error analysis and solutions</li>
+                <li><strong>Track State Monitoring:</strong> Monitors track readyState and enabled status</li>
+                <li><strong>Renegotiation Improvements:</strong> Better offer/answer handling for audio</li>
+            </ul>
+        </div>
+
+        <div class="two-column">
+            <div>
+                <div class="diagnostic-section">
+                    <h3>🔍 Quick Audio Test</h3>
+                    <p>Test your microphone and audio transmission:</p>
+                    <button class="btn" onclick="testMicrophone()">🎤 Test Microphone</button>
+                    <button class="btn success" onclick="window.open('public/index.html', '_blank')">🚀 Open Audio Conference</button>
+                    <div id="microphoneTest" class="log-container" style="display: none;"></div>
+                </div>
+
+                <div class="diagnostic-section">
+                    <h3>🛠️ Step-by-Step Troubleshooting</h3>
+                    <ul class="checklist">
+                        <li><span class="step-number">1</span>Check microphone permissions in browser</li>
+                        <li><span class="step-number">2</span>Verify audio device is connected and working</li>
+                        <li><span class="step-number">3</span>Test with two browser tabs (same device)</li>
+                        <li><span class="step-number">4</span>Check console for audio track validation messages</li>
+                        <li><span class="step-number">5</span>Verify remote participants show "Connected" status</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div>
+                <div class="diagnostic-section">
+                    <h3>📊 Real-time Monitoring</h3>
+                    <button class="btn" onclick="startDiagnosticMonitoring()">🎯 Start Audio Monitoring</button>
+                    <button class="btn danger" onclick="stopDiagnosticMonitoring()">🛑 Stop Monitoring</button>
+                    <button class="btn" onclick="clearDiagnosticLog()">🗑️ Clear Log</button>
+                    <div id="diagnosticLog" class="log-container">
+                        Click "Start Audio Monitoring" to begin real-time audio diagnostics...
+                    </div>
+                </div>
+
+                <div class="diagnostic-section">
+                    <h3>⚡ Quick Fixes</h3>
+                    <button class="btn" onclick="refreshAudioDevices()">🔄 Refresh Audio Devices</button>
+                    <button class="btn" onclick="testWebRTCConnection()">🔗 Test WebRTC Connection</button>
+                    <button class="btn" onclick="clearBrowserCache()">🧹 Clear Browser Cache</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="diagnostic-section warning-section">
+            <h3>⚠️ Common Audio Transmission Issues</h3>
+            <div class="two-column">
+                <div>
+                    <h4>Issue: Remote participants show "No Audio"</h4>
+                    <ul>
+                        <li><strong>Cause:</strong> Audio tracks not properly added to peer connections</li>
+                        <li><strong>Solution:</strong> Fixed with enhanced track validation</li>
+                        <li><strong>Check:</strong> Console should show "🎵 Adding track: audio (enabled: true)"</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Issue: Audio works but stops after reconnection</h4>
+                    <ul>
+                        <li><strong>Cause:</strong> Missing renegotiation after track replacement</li>
+                        <li><strong>Solution:</strong> Added automatic renegotiation</li>
+                        <li><strong>Check:</strong> Console should show "🔄 Triggering renegotiation"</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="diagnostic-section success-section">
+            <h3>✅ Audio Transmission Success Indicators</h3>
+            <p>Look for these messages in the browser console:</p>
+            <ul>
+                <li><code>🎵 Starting audio capture...</code> - Audio initialization started</li>
+                <li><code>✅ Audio capture started successfully</code> - Local audio ready</li>
+                <li><code>🎵 Adding local audio tracks to connection</code> - Tracks added to peer connection</li>
+                <li><code>🎵 Received remote stream from: [peerId]</code> - Remote audio received</li>
+                <li><code>🔊 Remote stream from [peerId]: 1 audio tracks</code> - Audio track validation</li>
+                <li><code>🎤 Audio track 0: enabled=true, readyState=live</code> - Track is active</li>
+            </ul>
+        </div>
+
+        <div class="diagnostic-section error-section">
+            <h3>🚨 Emergency Troubleshooting</h3>
+            <p>If audio transmission still doesn't work:</p>
+            <ol>
+                <li><strong>Restart browser</strong> completely (close all tabs)</li>
+                <li><strong>Check system audio settings</strong> - ensure microphone isn't muted</li>
+                <li><strong>Try different browser</strong> (Chrome, Firefox, Edge)</li>
+                <li><strong>Disable browser extensions</strong> temporarily</li>
+                <li><strong>Check firewall settings</strong> - ensure WebRTC isn't blocked</li>
+                <li><strong>Use incognito/private mode</strong> to test</li>
+                <li><strong>Reset browser permissions</strong> for the site</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let diagnosticInterval;
+        let isMonitoring = false;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('diagnosticLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const statusClass = `status-${type}`;
+            
+            logDiv.innerHTML += `
+                <div>
+                    <span class="status-indicator ${statusClass}"></span>
+                    [${timestamp}] ${message}
+                </div>
+            `;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearDiagnosticLog() {
+            document.getElementById('diagnosticLog').innerHTML = 'Log cleared...';
+        }
+
+        async function testMicrophone() {
+            const testDiv = document.getElementById('microphoneTest');
+            testDiv.style.display = 'block';
+            testDiv.innerHTML = '🎤 Testing microphone access...';
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                const audioTracks = stream.getAudioTracks();
+                
+                testDiv.innerHTML = `
+                    <div style="color: #28a745;">✅ Microphone Test Successful</div>
+                    <div>Device: ${audioTracks[0].label}</div>
+                    <div>Audio Tracks: ${audioTracks.length}</div>
+                    <div>Track State: ${audioTracks[0].readyState}</div>
+                    <div>Track Enabled: ${audioTracks[0].enabled}</div>
+                `;
+
+                // Stop the test stream
+                stream.getTracks().forEach(track => track.stop());
+
+                log('✅ Microphone test successful', 'success');
+            } catch (error) {
+                testDiv.innerHTML = `
+                    <div style="color: #dc3545;">❌ Microphone Test Failed</div>
+                    <div>Error: ${error.name}</div>
+                    <div>Message: ${error.message}</div>
+                `;
+
+                log(`❌ Microphone test failed: ${error.name}`, 'error');
+                
+                // Provide specific solutions
+                if (error.name === 'NotAllowedError') {
+                    testDiv.innerHTML += '<div style="color: #007bff;">💡 Solution: Allow microphone permission in browser</div>';
+                } else if (error.name === 'NotFoundError') {
+                    testDiv.innerHTML += '<div style="color: #007bff;">💡 Solution: Connect a microphone device</div>';
+                }
+            }
+        }
+
+        function startDiagnosticMonitoring() {
+            if (isMonitoring) return;
+            
+            isMonitoring = true;
+            log('🎯 Starting audio diagnostic monitoring...', 'info');
+
+            // Monitor every 2 seconds
+            diagnosticInterval = setInterval(() => {
+                // Check if audio conference is running
+                if (window.audioConference) {
+                    const conf = window.audioConference;
+                    
+                    log(`📊 Room: ${conf.roomId || 'None'}, Connected: ${conf.isConnected}`, 'info');
+                    
+                    if (conf.localStream) {
+                        const tracks = conf.localStream.getAudioTracks();
+                        log(`🎤 Local: ${tracks.length} tracks, Enabled: ${tracks[0]?.enabled}`, 'success');
+                    } else {
+                        log('⚠️ No local audio stream', 'warning');
+                    }
+                    
+                    if (conf.remoteStreams.size > 0) {
+                        conf.remoteStreams.forEach((stream, peerId) => {
+                            const remoteTracks = stream.getAudioTracks();
+                            log(`🔊 Remote ${peerId}: ${remoteTracks.length} tracks`, 'success');
+                        });
+                    } else {
+                        log('📭 No remote streams', 'info');
+                    }
+                } else {
+                    log('⚠️ Audio conference not active - open the main interface', 'warning');
+                }
+            }, 2000);
+        }
+
+        function stopDiagnosticMonitoring() {
+            if (!isMonitoring) return;
+            
+            isMonitoring = false;
+            clearInterval(diagnosticInterval);
+            log('🛑 Audio monitoring stopped', 'info');
+        }
+
+        function refreshAudioDevices() {
+            log('🔄 Refreshing audio devices...', 'info');
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+                const audioDevices = devices.filter(device => device.kind === 'audioinput');
+                log(`🎤 Found ${audioDevices.length} audio input devices`, 'success');
+                audioDevices.forEach((device, index) => {
+                    log(`  Device ${index + 1}: ${device.label || 'Unknown'}`, 'info');
+                });
+            }).catch(error => {
+                log(`❌ Failed to enumerate devices: ${error.message}`, 'error');
+            });
+        }
+
+        function testWebRTCConnection() {
+            log('🔗 Testing WebRTC connection...', 'info');
+            
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    log(`🧊 ICE candidate found: ${event.candidate.type}`, 'success');
+                } else {
+                    log('✅ ICE gathering complete', 'success');
+                }
+            };
+
+            pc.createDataChannel('test');
+            pc.createOffer().then(offer => {
+                return pc.setLocalDescription(offer);
+            }).then(() => {
+                log('✅ WebRTC offer created successfully', 'success');
+            }).catch(error => {
+                log(`❌ WebRTC test failed: ${error.message}`, 'error');
+            });
+
+            // Clean up after 10 seconds
+            setTimeout(() => {
+                pc.close();
+                log('🗑️ WebRTC test connection closed', 'info');
+            }, 10000);
+        }
+
+        function clearBrowserCache() {
+            log('🧹 Clearing browser cache...', 'info');
+            alert('Please manually clear your browser cache:\n\n1. Press Ctrl+Shift+Delete\n2. Select "All time"\n3. Clear browsing data\n4. Restart browser');
+        }
+
+        // Auto-start monitoring if audio conference is detected
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (window.opener && window.opener.audioConference) {
+                    log('🔗 Detected audio conference in parent window', 'success');
+                    startDiagnosticMonitoring();
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

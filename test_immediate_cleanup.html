@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immediate Cleanup Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 5px; height: 200px; overflow-y: auto; margin: 10px 0; }
+        .room-count { font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Immediate Cleanup Test</h1>
+        <p class="info">This test verifies that rooms are immediately cleaned up when users leave or close their browsers.</p>
+        
+        <div class="test-section">
+            <h3>📊 Real-time Room Monitor</h3>
+            <div class="room-count" id="roomCount">Loading...</div>
+            <div id="roomList"></div>
+            <button onclick="refreshRooms()">🔄 Manual Refresh</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Test Scenarios</h3>
+            
+            <h4>Scenario 1: Normal Leave</h4>
+            <p>1. Open main interface → 2. Create/join room → 3. Click "Leave Room" → 4. Watch room disappear immediately</p>
+            <button onclick="window.open('public/index.html', '_blank')">🎙️ Open Interface</button>
+            
+            <h4>Scenario 2: Browser Close</h4>
+            <p>1. Open main interface → 2. Create/join room → 3. Close browser tab → 4. Watch room disappear within 30 seconds</p>
+            <button onclick="window.open('public/index.html', '_blank')">🎙️ Open Interface</button>
+            
+            <h4>Scenario 3: Page Navigation</h4>
+            <p>1. Open main interface → 2. Create/join room → 3. Navigate away (refresh/new URL) → 4. Watch room disappear immediately</p>
+            <button onclick="window.open('public/index.html', '_blank')">🎙️ Open Interface</button>
+            
+            <h4>Scenario 4: Tab Switching + Inactivity</h4>
+            <p>1. Open main interface → 2. Create/join room → 3. Switch to another tab → 4. Wait 30 seconds → 5. Room should be cleaned up</p>
+            <button onclick="window.open('public/index.html', '_blank')">🎙️ Open Interface</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📋 Cleanup Log</h3>
+            <div id="cleanupLog" class="log"></div>
+            <button onclick="clearLog()">🧹 Clear Log</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>⚡ Manual Cleanup Tools</h3>
+            <button onclick="runCleanup()">🧹 Force Cleanup</button>
+            <button onclick="resetDatabase()">🗑️ Reset Database</button>
+        </div>
+    </div>
+
+    <script>
+        let lastRoomCount = 0;
+        let monitorInterval;
+        
+        function logCleanup(message, type = 'info') {
+            const logDiv = document.getElementById('cleanupLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        async function refreshRooms() {
+            try {
+                const response = await fetch('public/api.php?action=list_rooms');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const currentCount = result.data.rooms.length;
+                    document.getElementById('roomCount').textContent = `${currentCount} active rooms`;
+                    
+                    // Check for changes
+                    if (currentCount !== lastRoomCount) {
+                        if (currentCount < lastRoomCount) {
+                            logCleanup(`✅ Room count decreased: ${lastRoomCount} → ${currentCount} (cleanup detected!)`, 'success');
+                        } else if (currentCount > lastRoomCount) {
+                            logCleanup(`📈 Room count increased: ${lastRoomCount} → ${currentCount} (new room created)`, 'info');
+                        }
+                        lastRoomCount = currentCount;
+                    }
+                    
+                    // Display room details
+                    let roomsHtml = '';\n                    if (result.data.rooms.length === 0) {
+                        roomsHtml = '<div class="success">✅ No active rooms - cleanup is working!</div>';
+                    } else {
+                        roomsHtml = '<div class="info">Active rooms:</div>';
+                        for (const room of result.data.rooms) {
+                            const roomNumber = room.room_id.split('_')[0];
+                            
+                            // Get participant count
+                            try {
+                                const peersResponse = await fetch(`public/api.php?action=peers&roomId=${room.room_id}`);
+                                const peersResult = await peersResponse.json();
+                                const participantCount = peersResult.success ? peersResult.data.peers.length : '?';
+                                
+                                roomsHtml += `<div>• Room #${roomNumber} (${room.name}) - ${participantCount} participants</div>`;
+                            } catch (error) {
+                                roomsHtml += `<div>• Room #${roomNumber} (${room.name}) - Error loading participants</div>`;
+                            }
+                        }
+                    }
+                    
+                    document.getElementById('roomList').innerHTML = roomsHtml;
+                } else {
+                    document.getElementById('roomCount').textContent = 'Error loading rooms';
+                    logCleanup('❌ Failed to load rooms: ' + result.error, 'error');
+                }
+            } catch (error) {
+                document.getElementById('roomCount').textContent = 'Connection error';
+                logCleanup('❌ Connection error: ' + error.message, 'error');
+            }
+        }
+        
+        async function runCleanup() {
+            try {
+                logCleanup('🧹 Running manual cleanup...', 'info');
+                const response = await fetch('quick_cleanup.php');
+                const result = await response.text();
+                logCleanup('Cleanup result: ' + result, 'success');
+                
+                // Refresh rooms after cleanup
+                setTimeout(refreshRooms, 500);
+            } catch (error) {
+                logCleanup('❌ Cleanup failed: ' + error.message, 'error');
+            }
+        }
+        
+        async function resetDatabase() {
+            if (!confirm('Are you sure you want to reset the entire database?')) return;
+            
+            try {
+                logCleanup('🗑️ Resetting database...', 'info');
+                const response = await fetch('setup_db.php');
+                const result = await response.text();
+                logCleanup('Database reset complete', 'success');
+                
+                // Refresh rooms after reset
+                setTimeout(refreshRooms, 500);
+            } catch (error) {
+                logCleanup('❌ Database reset failed: ' + error.message, 'error');
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('cleanupLog').innerHTML = '';
+        }
+        
+        function startMonitoring() {
+            // Monitor room changes every 2 seconds
+            monitorInterval = setInterval(refreshRooms, 2000);
+            logCleanup('🔍 Started real-time monitoring (every 2 seconds)', 'info');
+        }
+        
+        function stopMonitoring() {
+            if (monitorInterval) {
+                clearInterval(monitorInterval);
+                logCleanup('🛑 Stopped real-time monitoring', 'info');
+            }
+        }
+        
+        // Auto-start monitoring on page load
+        window.addEventListener('load', () => {
+            logCleanup('🚀 Immediate Cleanup Test Tool Loaded', 'info');
+            refreshRooms();
+            startMonitoring();
+        });
+        
+        // Stop monitoring when page unloads
+        window.addEventListener('beforeunload', stopMonitoring);
+    </script>
+</body>
+</html>

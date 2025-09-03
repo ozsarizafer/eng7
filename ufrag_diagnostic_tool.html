@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Unknown Ufrag Error Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #dc3545;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+
+        .error-section {
+            background: #fff5f5;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #dc3545;
+        }
+
+        .solution-section {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #28a745;
+        }
+
+        .info-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 5px solid #007bff;
+        }
+
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .btn.danger {
+            background: #dc3545;
+        }
+
+        .btn.danger:hover {
+            background: #c82333;
+        }
+
+        .btn.success {
+            background: #28a745;
+        }
+
+        .btn.success:hover {
+            background: #1e7e34;
+        }
+
+        .log-container {
+            background: #212529;
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+
+        .fix-list {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-error { background-color: #dc3545; }
+        .status-success { background-color: #28a745; }
+        .status-warning { background-color: #ffc107; }
+        .status-info { background-color: #17a2b8; }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .ufrag-details {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Unknown Ufrag Error Diagnostic Tool</h1>
+        <p class="subtitle">Complete solution for "Unknown ufrag (22021986)" WebRTC errors</p>
+
+        <div class="error-section">
+            <h3>🚨 Error Analysis: "Unknown ufrag (22021986)"</h3>
+            <p><strong>What is this error?</strong></p>
+            <ul>
+                <li><strong>Ufrag</strong> = "Username Fragment" - a unique identifier for WebRTC ICE sessions</li>
+                <li><strong>"Unknown ufrag"</strong> = ICE candidate received for a session that no longer exists</li>
+                <li><strong>Root cause</strong> = Stale ICE candidates being processed after connection reset</li>
+            </ul>
+            
+            <div class="ufrag-details">
+                <strong>Example Ufrag in ICE Candidate:</strong><br>
+                candidate:1 1 UDP 2113667326 192.168.1.100 54321 typ host ufrag 22021986<br>
+                <span style="color: #dc3545;">↑ This ufrag "22021986" doesn't match current connection</span>
+            </div>
+        </div>
+
+        <div class="solution-section">
+            <h3>✅ Applied Fixes</h3>
+            <div class="fix-list">
+                <h4>1. Enhanced ICE Candidate Validation</h4>
+                <ul>
+                    <li><strong>Connection Version Tracking:</strong> Each connection has a unique version number</li>
+                    <li><strong>Ufrag Validation:</strong> Validates ICE candidate format before processing</li>
+                    <li><strong>State Validation:</strong> Checks connection and signaling states</li>
+                    <li><strong>Stale Candidate Detection:</strong> Rejects candidates from old connections</li>
+                </ul>
+
+                <h4>2. Persistent Error Recovery</h4>
+                <ul>
+                    <li><strong>Error Counting:</strong> Tracks repeated ufrag errors per peer</li>
+                    <li><strong>Automatic Reset:</strong> Resets connection after 3 consecutive errors</li>
+                    <li><strong>Graceful Reconnection:</strong> Waits 2 seconds before retry</li>
+                    <li><strong>Clean State Management:</strong> Proper connection cleanup</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="two-column">
+            <div>
+                <div class="info-section">
+                    <h3>🔍 Real-time Ufrag Monitoring</h3>
+                    <button class="btn" onclick="startUfragMonitoring()">🎯 Start Monitoring</button>
+                    <button class="btn danger" onclick="stopUfragMonitoring()">🛑 Stop Monitoring</button>
+                    <button class="btn" onclick="clearUfragLog()">🗑️ Clear Log</button>
+                    <div id="ufragLog" class="log-container">
+                        Click "Start Monitoring" to begin ufrag error tracking...
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>🛠️ Manual Diagnostics</h3>
+                    <button class="btn" onclick="diagnoseCurrentConnections()">🔍 Check Current Connections</button>
+                    <button class="btn" onclick="testConnectionVersions()">📊 Test Connection Versions</button>
+                    <button class="btn success" onclick="window.open('public/index.html', '_blank')">🚀 Open Main Interface</button>
+                </div>
+            </div>
+
+            <div>
+                <div class="info-section">
+                    <h3>📋 Success Indicators</h3>
+                    <p>When the fix is working correctly, you should see:</p>
+                    <ul>
+                        <li><code>🔢 Peer connection to [peerId] created with version [X]</code></li>
+                        <li><code>🧊 Sending ICE candidate to [peerId] (version: [X])</code></li>
+                        <li><code>⚠️ Ignoring stale ICE candidate for [peerId] - version mismatch</code></li>
+                        <li><code>✅ Added ICE candidate for [peerId] (ufrag validated)</code></li>
+                    </ul>
+                </div>
+
+                <div class="error-section">
+                    <h3>⚠️ Warning Signs</h3>
+                    <p>If you still see these, the connection needs reset:</p>
+                    <ul>
+                        <li><code>⚠️ ICE candidate ufrag mismatch for [peerId]</code></li>
+                        <li><code>🔄 Multiple ufrag errors detected, suggesting connection reset</code></li>
+                        <li><code>🗑️ Closing connection with persistent ufrag errors</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>🔧 Technical Implementation Details</h3>
+            <div class="code-block">
+<strong>Enhanced ICE Candidate Validation:</strong>
+// Validate connection version to prevent stale candidates
+if (peerConnection.connectionVersion !== this.connectionVersion) {
+    console.log(`⚠️ Ignoring stale ICE candidate - version mismatch`);
+    return;
+}
+
+// Validate candidate format
+if (!candidate.candidate || !candidate.candidate.includes('ufrag')) {
+    console.warn(`⚠️ Invalid ICE candidate format`);
+    return;
+}
+
+<strong>Persistent Error Recovery:</strong>
+// Track ufrag errors and reset after threshold
+this.ufragErrorCount = (this.ufragErrorCount || 0) + 1;
+if (this.ufragErrorCount >= 3) {
+    this.handlePersistentUfragError(peerId);
+}
+            </div>
+        </div>
+
+        <div class="solution-section">
+            <h3>🎯 How to Test the Fix</h3>
+            <ol>
+                <li><strong>Open two browser tabs</strong> with the audio conference</li>
+                <li><strong>Create a room</strong> in Tab 1, join with Tab 2</li>
+                <li><strong>Monitor console logs</strong> for connection version messages</li>
+                <li><strong>Leave and rejoin rooms rapidly</strong> to test stale candidate handling</li>
+                <li><strong>Check for success indicators</strong> listed above</li>
+            </ol>
+        </div>
+
+        <div class="error-section">
+            <h3>🚨 If Errors Persist</h3>
+            <p>If you still get "Unknown ufrag" errors after the fix:</p>
+            <ol>
+                <li><strong>Clear browser cache</strong> completely (Ctrl+Shift+Delete)</li>
+                <li><strong>Restart browser</strong> to clear WebRTC state</li>
+                <li><strong>Check network stability</strong> - unstable connections cause more ICE candidates</li>
+                <li><strong>Try incognito mode</strong> to test without extensions</li>
+                <li><strong>Use the diagnostic tool</strong> above to monitor real-time</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let ufragMonitoringInterval;
+        let isUfragMonitoring = false;
+
+        function ufragLog(message, type = 'info') {
+            const logDiv = document.getElementById('ufragLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const statusClass = `status-${type}`;
+            
+            logDiv.innerHTML += `
+                <div>
+                    <span class="status-indicator ${statusClass}"></span>
+                    [${timestamp}] ${message}
+                </div>
+            `;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearUfragLog() {
+            document.getElementById('ufragLog').innerHTML = 'Log cleared...';
+        }
+
+        function startUfragMonitoring() {
+            if (isUfragMonitoring) return;
+            
+            isUfragMonitoring = true;
+            ufragLog('🎯 Starting ufrag error monitoring...', 'info');
+
+            // Override console.warn to capture ufrag errors
+            const originalWarn = console.warn;
+            console.warn = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('ufrag')) {
+                    ufragLog(`🚨 UFRAG ERROR: ${message}`, 'error');
+                } else if (message.includes('ICE candidate')) {
+                    ufragLog(`⚠️ ICE WARNING: ${message}`, 'warning');
+                }
+                originalWarn.apply(console, args);
+            };
+
+            // Monitor connection states
+            ufragMonitoringInterval = setInterval(() => {
+                if (window.audioConference) {
+                    const conf = window.audioConference;
+                    ufragLog(`📊 Active connections: ${conf.peerConnections.size}, Version: ${conf.connectionVersion}`, 'info');
+                    
+                    conf.peerConnections.forEach((pc, peerId) => {
+                        ufragLog(`🔗 ${peerId}: state=${pc.connectionState}, version=${pc.connectionVersion}, age=${Date.now() - pc.createdAt}ms`, 'info');
+                    });
+                } else {
+                    ufragLog('⚠️ Audio conference not active', 'warning');
+                }
+            }, 5000);
+        }
+
+        function stopUfragMonitoring() {
+            if (!isUfragMonitoring) return;
+            
+            isUfragMonitoring = false;
+            clearInterval(ufragMonitoringInterval);
+            ufragLog('🛑 Ufrag monitoring stopped', 'info');
+        }
+
+        function diagnoseCurrentConnections() {
+            ufragLog('🔍 Diagnosing current WebRTC connections...', 'info');
+            
+            if (window.audioConference) {
+                const conf = window.audioConference;
+                
+                ufragLog(`📈 Global connection version: ${conf.connectionVersion}`, 'info');
+                ufragLog(`🏠 Connected to room: ${conf.roomId || 'None'}`, 'info');
+                ufragLog(`👥 Peer connections: ${conf.peerConnections.size}`, 'info');
+                
+                if (conf.peerConnections.size === 0) {
+                    ufragLog('✅ No active connections - no ufrag conflicts possible', 'success');
+                } else {
+                    conf.peerConnections.forEach((pc, peerId) => {
+                        const versionMatch = pc.connectionVersion === conf.connectionVersion;
+                        const statusIcon = versionMatch ? '✅' : '❌';
+                        const status = versionMatch ? 'success' : 'error';
+                        
+                        ufragLog(`${statusIcon} ${peerId}: v${pc.connectionVersion} (${versionMatch ? 'OK' : 'VERSION MISMATCH'})`, status);
+                        ufragLog(`   State: ${pc.connectionState}, Signaling: ${pc.signalingState}`, 'info');
+                    });
+                }
+            } else {
+                ufragLog('❌ Audio conference not loaded', 'error');
+            }
+        }
+
+        function testConnectionVersions() {
+            ufragLog('📊 Testing connection version consistency...', 'info');
+            
+            if (!window.audioConference) {
+                ufragLog('❌ Audio conference not available for testing', 'error');
+                return;
+            }
+            
+            const conf = window.audioConference;
+            const currentVersion = conf.connectionVersion;
+            let versionMismatches = 0;
+            
+            conf.peerConnections.forEach((pc, peerId) => {
+                if (pc.connectionVersion !== currentVersion) {
+                    versionMismatches++;
+                    ufragLog(`❌ Version mismatch detected: ${peerId} has v${pc.connectionVersion}, expected v${currentVersion}`, 'error');
+                }
+            });
+            
+            if (versionMismatches === 0) {
+                ufragLog('✅ All connections have consistent versions - no ufrag errors expected', 'success');
+            } else {
+                ufragLog(`❌ ${versionMismatches} version mismatches found - expect ufrag errors`, 'error');
+                ufragLog('💡 Suggestion: Reset connections or restart the application', 'warning');
+            }
+        }
+
+        // Auto-start monitoring if parent window has audio conference
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (window.opener && window.opener.audioConference) {
+                    ufragLog('🔗 Detected audio conference in parent window', 'success');
+                    startUfragMonitoring();
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

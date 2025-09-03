@@ -57,6 +57,15 @@ class SignalController {
                 case 'list_rooms':
                     $this->handleListRooms();
                     break;
+                case 'heartbeat':
+                    $this->handleHeartbeat();
+                    break;
+                case 'stats':
+                    $this->handleStats();
+                    break;
+                case 'unlock':
+                    $this->handleDatabaseUnlock();
+                    break;
                 default:
                     $this->sendError('Invalid action', 400);
             }
@@ -133,22 +142,36 @@ class SignalController {
         $input = $this->getJsonInput();
         $peerId = $input['peerId'] ?? '';
         $roomId = $input['roomId'] ?? 'default';
+        $reason = $input['reason'] ?? 'manual';
 
         if (empty($peerId)) {
             $this->sendError('Peer ID is required', 400);
             return;
         }
 
+        // Log disconnect reason for monitoring
+        error_log("Peer disconnect - ID: $peerId, Room: $roomId, Reason: $reason");
+
         // Notify other peers before leaving
         $this->signal->broadcastToRoom($roomId, $peerId, 'peer-left', [
-            'peerId' => $peerId
+            'peerId' => $peerId,
+            'reason' => $reason
         ]);
 
         $this->signal->leavePeer($peerId);
+        
+        // Trigger immediate cleanup for performance
+        try {
+            $this->signal->cleanupInactivePeers(0.5); // Very aggressive - 30 seconds
+            $this->signal->cleanupEmptyRooms();
+        } catch (Exception $cleanupError) {
+            error_log("Cleanup during leave failed: " . $cleanupError->getMessage());
+        }
 
         $this->sendSuccess([
             'message' => 'Successfully left room',
-            'peerId' => $peerId
+            'peerId' => $peerId,
+            'reason' => $reason
         ]);
     }
 
@@ -233,16 +256,16 @@ class SignalController {
             // Update last seen
             $this->signal->updatePeerLastSeen($peerId);
             
-            // More frequent cleanup - every 5 seconds (increased frequency)
+            // More frequent cleanup - every 3 seconds (increased frequency)
             $cleanupCounter++;
-            if ($cleanupCounter >= 5) {
-                $this->signal->cleanupInactivePeers(1); // More aggressive - Clean peers inactive for 1+ minutes
+            if ($cleanupCounter >= 3) {
+                $this->signal->bulkCleanupInactivePeers(0.5); // Very aggressive - Clean peers inactive for 30+ seconds
                 $cleanupCounter = 0;
             }
             
-            // Update room list more frequently - every 5 seconds
+            // Update room list more frequently - every 3 seconds
             $roomListUpdateCounter++;
-            if ($roomListUpdateCounter >= 5) {
+            if ($roomListUpdateCounter >= 3) {
                 // Send room list update to all connected peers
                 $this->broadcastRoomListUpdate();
                 $roomListUpdateCounter = 0;
@@ -349,6 +372,99 @@ class SignalController {
             ]);
         } catch (Exception $e) {
             $this->sendError('Failed to retrieve rooms: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleHeartbeat() {
+        $input = $this->getJsonInput();
+        $peerId = $input['peerId'] ?? '';
+        $roomId = $input['roomId'] ?? '';
+        
+        if (empty($peerId)) {
+            $this->sendError('Peer ID is required', 400);
+            return;
+        }
+        
+        try {
+            // Update peer's last seen timestamp
+            $this->signal->updatePeerLastSeen($peerId);
+            
+            // Get current room info for the peer
+            $peers = $roomId ? $this->signal->getRoomPeers($roomId) : [];
+            $peerExists = false;
+            foreach ($peers as $peer) {
+                if ($peer['peer_id'] === $peerId) {
+                    $peerExists = true;
+                    break;
+                }
+            }
+            
+            if (!$peerExists && !empty($roomId)) {
+                // Peer not found in room, might have been cleaned up
+                $this->sendError('Peer not found in room, please rejoin', 404);
+                return;
+            }
+            
+            $this->sendSuccess([
+                'message' => 'Heartbeat received',
+                'peerId' => $peerId,
+                'timestamp' => time(),
+                'room_peers_count' => count($peers)
+            ]);
+            
+        } catch (Exception $e) {
+            $this->sendError('Heartbeat failed: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleStats() {
+        try {
+            $stats = $this->signal->getSystemStats();
+            
+            $this->sendSuccess([
+                'message' => 'System statistics retrieved',
+                'stats' => $stats,
+                'timestamp' => time()
+            ]);
+        } catch (Exception $e) {
+            $this->sendError('Failed to get stats: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleDatabaseUnlock() {
+        try {
+            $db = Database::getInstance();
+            
+            // Check current lock status
+            $wasLocked = $db->isDatabaseLocked();
+            
+            // Perform unlock and optimization
+            $optimized = $db->optimizeAndUnlock();
+            
+            // Check final lock status
+            $isStillLocked = $db->isDatabaseLocked();
+            
+            // Perform additional cleanup to prevent future locks
+            $inactiveCount = $this->signal->cleanupInactivePeers(0.1); // Very aggressive
+            $messageCount = $this->signal->cleanupOldMessages(0.5); // Clean messages older than 30 minutes
+            $emptyRoomsCount = $this->signal->cleanupEmptyRooms();
+            
+            $this->sendSuccess([
+                'message' => 'Database unlock completed',
+                'was_locked' => $wasLocked,
+                'optimization_success' => $optimized,
+                'is_still_locked' => $isStillLocked,
+                'cleanup_results' => [
+                    'inactive_peers_removed' => $inactiveCount,
+                    'old_messages_removed' => $messageCount,
+                    'empty_rooms_removed' => $emptyRoomsCount
+                ],
+                'timestamp' => time()
+            ]);
+            
+        } catch (Exception $e) {
+            error_log("Database unlock failed: " . $e->getMessage());
+            $this->sendError('Database unlock failed: ' . $e->getMessage(), 500);
         }
     }
 
