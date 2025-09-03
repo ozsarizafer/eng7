@@ -501,6 +501,9 @@ class AudioConferenceClient {
             case 'ice-candidate':
                 await this.handleIceCandidate(message);
                 break;
+            case 'room-list-update':
+                this.handleRoomListUpdate(message.data);
+                break;
         }
     }
 
@@ -534,6 +537,18 @@ class AudioConferenceClient {
         
         // Refresh room list to update participant counts for other rooms too
         setTimeout(() => this.loadAvailableRooms(), 500);
+    }
+
+    handleRoomListUpdate(data) {
+        console.log('📋 Received room list update:', data);
+        
+        // Update the room list immediately without delay
+        if (data.rooms && Array.isArray(data.rooms)) {
+            this.updateRoomList(data.rooms);
+        } else {
+            // If data format is different, fall back to API call
+            this.loadAvailableRooms();
+        }
     }
 
     async handleOffer(message) {
@@ -945,6 +960,14 @@ class AudioConferenceClient {
             // Add click event listeners to room cards
             this.bindRoomCardEvents();
         });
+    }
+
+    updateRoomList(rooms) {
+        // Direct update method for real-time room list updates
+        console.log('📋 Updating room list with real-time data');
+        
+        this.displayAvailableRooms(rooms);
+        this.roomCount.textContent = `${rooms.length} room(s) available`;
     }
 
     async getRoomParticipantCounts(rooms) {

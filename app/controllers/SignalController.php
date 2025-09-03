@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../models/Signal.php';
 require_once __DIR__ . '/../config/HttpsRedirect.php';
+require_once __DIR__ . '/../config/Database.php';
 
 class SignalController {
     private $signal;
@@ -77,9 +78,9 @@ class SignalController {
         }
 
         try {
-            // Clean up inactive peers before checking capacity (peers inactive for more than 5 minutes)
+            // Clean up inactive peers before checking capacity (more aggressive - 2 minutes)
             try {
-                $this->signal->cleanupInactivePeers(5);
+                $this->signal->cleanupInactivePeers(2);
             } catch (Exception $cleanupError) {
                 error_log("Cleanup failed, continuing with join: " . $cleanupError->getMessage());
                 // Don't let cleanup failure prevent joining
@@ -226,16 +227,25 @@ class SignalController {
         // Keep connection alive and send events
         $lastEventId = $_SERVER['HTTP_LAST_EVENT_ID'] ?? 0;
         $cleanupCounter = 0; // Counter to periodically run cleanup
+        $roomListUpdateCounter = 0; // Counter to refresh room list
         
         while (true) {
             // Update last seen
             $this->signal->updatePeerLastSeen($peerId);
             
-            // Periodically cleanup inactive peers (every 30 seconds)
+            // More frequent cleanup - every 5 seconds (increased frequency)
             $cleanupCounter++;
-            if ($cleanupCounter >= 30) {
-                $this->signal->cleanupInactivePeers(5); // Clean peers inactive for 5+ minutes
+            if ($cleanupCounter >= 5) {
+                $this->signal->cleanupInactivePeers(1); // More aggressive - Clean peers inactive for 1+ minutes
                 $cleanupCounter = 0;
+            }
+            
+            // Update room list more frequently - every 5 seconds
+            $roomListUpdateCounter++;
+            if ($roomListUpdateCounter >= 5) {
+                // Send room list update to all connected peers
+                $this->broadcastRoomListUpdate();
+                $roomListUpdateCounter = 0;
             }
 
             // Get new messages
@@ -281,10 +291,14 @@ class SignalController {
         // Clean up old messages (older than 1 hour)
         $messageCount = $this->signal->cleanupOldMessages(1);
         
+        // Clean up empty rooms (rooms with no active participants)
+        $emptyRoomsCount = $this->signal->cleanupEmptyRooms();
+        
         $this->sendSuccess([
             'message' => 'Cleanup completed',
             'inactive_peers_removed' => $inactiveCount,
-            'old_messages_removed' => $messageCount
+            'old_messages_removed' => $messageCount,
+            'empty_rooms_removed' => $emptyRoomsCount
         ]);
     }
     
@@ -317,6 +331,15 @@ class SignalController {
     
     private function handleListRooms() {
         try {
+            // Clean up inactive peers and empty rooms before listing
+            try {
+                $this->signal->cleanupInactivePeers(1); // Clean peers inactive for 1+ minutes (more aggressive)
+                $this->signal->cleanupEmptyRooms(); // Clean empty rooms
+            } catch (Exception $cleanupError) {
+                error_log("Cleanup during room listing failed: " . $cleanupError->getMessage());
+                // Don't let cleanup failure prevent room listing
+            }
+            
             $rooms = $this->signal->getAllRooms();
             
             $this->sendSuccess([
@@ -343,5 +366,31 @@ class SignalController {
         http_response_code($code);
         echo json_encode(['success' => false, 'error' => $message]);
         exit();
+    }
+    
+    private function broadcastRoomListUpdate() {
+        try {
+            // Get current room list
+            $rooms = $this->signal->getAllRooms();
+            
+            // Get all active peers to broadcast to
+            $sql = "SELECT DISTINCT peer_id FROM peers WHERE is_connected = 1";
+            $db = Database::getInstance();
+            $stmt = $db->query($sql);
+            $activePeers = $stmt->fetchAll();
+            
+            // Broadcast room list update to all active peers
+            foreach ($activePeers as $peer) {
+                $this->signal->addSignalingMessage(
+                    'system', 
+                    $peer['peer_id'], 
+                    'system', 
+                    'room-list-update', 
+                    ['rooms' => $rooms, 'count' => count($rooms)]
+                );
+            }
+        } catch (Exception $e) {
+            error_log("Failed to broadcast room list update: " . $e->getMessage());
+        }
     }
 }

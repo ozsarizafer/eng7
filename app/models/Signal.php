@@ -34,12 +34,13 @@ class Signal {
     }
     
     public function getAllRooms() {
-        // Only return rooms that have active participants
+        // Only return rooms that have active participants (with recent activity)
         $sql = "SELECT r.room_id, r.name, r.created_at, r.is_active 
                 FROM rooms r 
                 WHERE EXISTS (
                     SELECT 1 FROM peers p 
                     WHERE p.room_id = r.room_id AND p.is_connected = 1
+                    AND p.last_seen >= datetime('now', '-2 minutes')
                 )
                 ORDER BY r.created_at DESC";
         $stmt = $this->db->query($sql);
@@ -140,18 +141,28 @@ class Signal {
         $this->db->query("PRAGMA foreign_keys = OFF");
         
         try {
-            // First, delete signaling messages for inactive peers
-            $sql = "DELETE FROM signaling_messages WHERE from_peer_id IN (
-                        SELECT peer_id FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')
-                    ) OR to_peer_id IN (
-                        SELECT peer_id FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')
-                    )";
-            $this->db->query($sql);
+            // Use datetime comparison for more reliable results
+            $sql = "SELECT peer_id FROM peers WHERE 
+                    last_seen < datetime('now', '-' || ? || ' minutes')";
+            $stmt = $this->db->query($sql, [$minutesOld]);
+            $inactivePeers = $stmt->fetchAll();
             
-            // Then delete the inactive peers
-            $sql = "DELETE FROM peers WHERE last_seen < datetime('now', '-" . intval($minutesOld) . " minutes')";
-            $stmt = $this->db->query($sql);
-            $deletedCount = $stmt->rowCount();
+            $deletedCount = 0;
+            
+            // Delete each inactive peer and their messages
+            foreach ($inactivePeers as $peer) {
+                $peerId = $peer['peer_id'];
+                
+                // Delete signaling messages for this peer
+                $sql = "DELETE FROM signaling_messages WHERE from_peer_id = ? OR to_peer_id = ?";
+                $this->db->query($sql, [$peerId, $peerId]);
+                
+                // Delete the peer
+                $sql = "DELETE FROM peers WHERE peer_id = ?";
+                $this->db->query($sql, [$peerId]);
+                
+                $deletedCount++;
+            }
             
             // Re-enable foreign key checks
             $this->db->query("PRAGMA foreign_keys = ON");
@@ -189,5 +200,47 @@ class Signal {
         }
         
         return $results;
+    }
+
+    public function cleanupEmptyRooms() {
+        // Temporarily disable foreign key checks for cleanup
+        $this->db->query("PRAGMA foreign_keys = OFF");
+        
+        try {
+            // Find rooms with no active participants (using datetime comparison)
+            $sql = "SELECT r.room_id FROM rooms r 
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM peers p 
+                        WHERE p.room_id = r.room_id AND p.is_connected = 1
+                        AND p.last_seen >= datetime('now', '-2 minutes')
+                    )";
+            $stmt = $this->db->query($sql);
+            $emptyRooms = $stmt->fetchAll();
+            
+            $deletedCount = 0;
+            foreach ($emptyRooms as $room) {
+                $roomId = $room['room_id'];
+                
+                // Delete signaling messages for this room
+                $this->db->query("DELETE FROM signaling_messages WHERE room_id = ?", [$roomId]);
+                
+                // Delete peers for this room
+                $this->db->query("DELETE FROM peers WHERE room_id = ?", [$roomId]);
+                
+                // Delete the room itself
+                $this->db->query("DELETE FROM rooms WHERE room_id = ?", [$roomId]);
+                
+                $deletedCount++;
+            }
+            
+            // Re-enable foreign key checks
+            $this->db->query("PRAGMA foreign_keys = ON");
+            
+            return $deletedCount;
+        } catch (Exception $e) {
+            // Re-enable foreign key checks in case of error
+            $this->db->query("PRAGMA foreign_keys = ON");
+            throw $e;
+        }
     }
 }
