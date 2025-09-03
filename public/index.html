@@ -458,8 +458,6 @@
         <div class="controls">
             <div class="input-group">
                 <input type="text" id="usernameInput" placeholder="Your username" />
-                <input type="text" id="roomInput" placeholder="Room ID (default: 'default')" value="default" />
-                <button id="joinBtn">Join Room</button>
                 <button id="newRoomBtn">New Room</button>
                 <button id="leaveBtn" disabled>Leave Room</button>
             </div>
@@ -489,9 +487,9 @@
             </div>
         </div>
 
-        <!-- Available Rooms Section -->
+        <!-- Available Rooms Section - Only way to join rooms -->
         <div class="available-rooms">
-            <h3>🏠 Available Rooms</h3>
+            <h3>🏠 Join a Room - Click to Enter</h3>
             <div class="room-controls">
                 <button id="refreshRoomsBtn" class="refresh-btn">🔄 Refresh</button>
                 <span class="room-count">Loading rooms...</span>

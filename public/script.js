@@ -37,10 +37,8 @@ class AudioConferenceClient {
     initializeElements() {
         // Input elements
         this.usernameInput = document.getElementById('usernameInput');
-        this.roomInput = document.getElementById('roomInput');
         
-        // Button elements
-        this.joinBtn = document.getElementById('joinBtn');
+        // Button elements  
         this.newRoomBtn = document.getElementById('newRoomBtn');
         this.leaveBtn = document.getElementById('leaveBtn');
         this.muteBtn = document.getElementById('muteBtn');
@@ -70,7 +68,6 @@ class AudioConferenceClient {
     }
 
     bindEvents() {
-        this.joinBtn.addEventListener('click', () => this.joinRoom());
         this.newRoomBtn.addEventListener('click', () => this.createNewRoom());
         this.leaveBtn.addEventListener('click', () => this.leaveRoom());
         this.muteBtn.addEventListener('click', () => this.muteAudio());
@@ -419,9 +416,16 @@ class AudioConferenceClient {
         `;
     }
 
-    async joinRoom() {
+    async joinRoom(targetRoomId = null) {
         this.username = this.usernameInput.value.trim() || 'Anonymous';
-        this.roomId = this.roomInput.value.trim() || 'default';
+        
+        // Use target room ID if provided (from room card click), otherwise use stored roomId
+        if (targetRoomId) {
+            this.roomId = targetRoomId;
+        } else if (!this.roomId) {
+            this.showMessage('No room selected. Please click on a room in the Available Rooms section.', 'error');
+            return;
+        }
 
         try {
             // Ensure clean state before joining
@@ -840,8 +844,7 @@ class AudioConferenceClient {
             const result = await response.json();
             
             if (result.success) {
-                // Set the new room ID in the input field
-                this.roomInput.value = result.data.roomId;
+                // Store the new room ID for automatic joining
                 this.roomId = result.data.roomId;
                 
                 this.showMessage(`New room created: ${result.data.roomName} (ID: ${result.data.roomId})`, 'success');
@@ -2062,15 +2065,13 @@ class AudioConferenceClient {
         const hasAudio = this.localStream && this.localStream.getAudioTracks().length > 0;
 
         // Enable/disable buttons based on connection state
-        this.joinBtn.disabled = this.isConnected;
         this.newRoomBtn.disabled = this.isConnected;
         this.leaveBtn.disabled = !this.isConnected;
         this.muteBtn.disabled = !hasAudio || this.isMuted;
         this.unmuteBtn.disabled = !hasAudio || !this.isMuted;
 
-        // Disable inputs when connected
+        // Disable username input when connected
         this.usernameInput.disabled = this.isConnected;
-        this.roomInput.disabled = this.isConnected;
     }
 
     showMessage(message, type = 'info') {
@@ -2225,12 +2226,9 @@ class AudioConferenceClient {
                     this.usernameInput.value = 'User' + Math.floor(Math.random() * 1000);
                 }
                 
-                // Set room info and join
-                this.roomInput.value = roomId;
-                this.roomId = roomId;
-                
+                // Join the selected room directly
                 this.showMessage(`Joining room "${roomName}" (#${roomId.split('_')[0]})...`, 'info');
-                await this.joinRoom();
+                await this.joinRoom(roomId);
             });
         });
     }
