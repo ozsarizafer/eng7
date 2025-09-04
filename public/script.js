@@ -14,6 +14,14 @@ class AudioConferenceClient {
         this.roomCapacities = new Map(); // Track room capacities for optimal joining
         this.joinInProgress = false; // Prevent concurrent join attempts
         
+        // Competition properties
+        this.currentGameId = null;
+        this.currentQuestions = [];
+        this.isPlayerReady = false;
+        this.playerTeam = null;
+        this.gameTimer = null;
+        this.selectedAnswer = null;
+        
         // Get the current host and port for API calls
         this.apiBase = this.getApiBase();
         
@@ -68,6 +76,39 @@ class AudioConferenceClient {
 
         // Set peer ID display
         this.peerIdDisplay.textContent = this.peerId;
+        
+        // Competition elements
+        this.competitionPortal = document.getElementById('competitionPortal');
+        this.readyBtn = document.getElementById('readyBtn');
+        this.gameStatus = document.getElementById('gameStatus');
+        this.teamsDisplay = document.getElementById('teamsDisplay');
+        this.teamAMembers = document.getElementById('teamAMembers');
+        this.teamBMembers = document.getElementById('teamBMembers');
+        this.scoreboard = document.getElementById('scoreboard');
+        this.teamAScore = document.getElementById('teamAScore');
+        this.teamBScore = document.getElementById('teamBScore');
+        
+        this.questionDisplay = document.getElementById('questionDisplay');
+        this.questionNumber = document.getElementById('questionNumber');
+        this.currentTeamDisplay = document.getElementById('currentTeamDisplay');
+        this.timerDisplay = document.getElementById('timerDisplay');
+        this.questionContent = document.getElementById('questionContent');
+        this.optionsGrid = document.getElementById('optionsGrid');
+        this.submitAnswerBtn = document.getElementById('submitAnswerBtn');
+        this.currentScoreboard = document.getElementById('currentScoreboard');
+        this.currentTeamAScore = document.getElementById('currentTeamAScore');
+        this.currentTeamBScore = document.getElementById('currentTeamBScore');
+        this.nextQuestionBtn = document.getElementById('nextQuestionBtn');
+        
+        this.resultsDisplay = document.getElementById('resultsDisplay');
+        this.winnerAnnouncement = document.getElementById('winnerAnnouncement');
+        this.finalTeamAScore = document.getElementById('finalTeamAScore');
+        this.finalTeamBScore = document.getElementById('finalTeamBScore');
+        this.newCompetitionBtn = document.getElementById('newCompetitionBtn');
+        
+        // Team selection elements
+        this.selectTeamABtn = document.getElementById('selectTeamABtn');
+        this.selectTeamBBtn = document.getElementById('selectTeamBBtn');
     }
 
     bindEvents() {
@@ -82,6 +123,9 @@ class AudioConferenceClient {
         
         // Load available rooms on page load
         this.loadAvailableRooms();
+        
+        // Competition event bindings
+        this.bindCompetitionEvents();
     }
 
     generatePeerId() {
@@ -834,9 +878,13 @@ class AudioConferenceClient {
 
         // Stop signaling
         if (this.eventSource) {
+            console.log('📏 Closing SSE connection');
             this.eventSource.close();
             this.eventSource = null;
         }
+        
+        // Reset reconnection attempts
+        this.reconnectAttempts = 0;
         
         // Clear peer list
         this.existingPeers = [];
@@ -902,7 +950,24 @@ class AudioConferenceClient {
         
         this.eventSource.onmessage = (event) => {
             try {
+                // Validate that event.data exists and is not empty
+                if (!event.data || event.data.trim() === '') {
+                    console.log('📭 Received empty SSE message, ignoring');
+                    return;
+                }
+                
+                // Skip browser-generated events that don't contain actual data
+                if (event.data === 'null' || event.data === 'undefined') {
+                    return;
+                }
+                
                 const message = JSON.parse(event.data);
+                
+                // Validate message structure
+                if (!message || typeof message !== 'object') {
+                    console.warn('⚠️ Invalid message structure:', message);
+                    return;
+                }
                 
                 // Handle batched messages
                 if (message.type === 'batch' && message.messages) {
@@ -916,7 +981,13 @@ class AudioConferenceClient {
                     this.handleSignalingMessage(message);
                 }
             } catch (error) {
-                console.error('Failed to parse signaling message:', error);
+                // Don't log JSON parse errors for browser events
+                if (event.data && !event.data.includes('isTrusted')) {
+                    console.error('Failed to parse signaling message:', error);
+                    console.log('Raw message data:', event.data);
+                } else {
+                    console.log('📭 Ignoring browser-generated SSE event');
+                }
             }
         };
 
@@ -938,6 +1009,12 @@ class AudioConferenceClient {
                     }
                 }, reconnectDelay);
             }
+        };
+        
+        // Reset reconnection attempts on successful connection
+        this.eventSource.onopen = () => {
+            console.log('✅ SSE connection established successfully');
+            this.reconnectAttempts = 0;
         };
     }
 
@@ -966,12 +1043,23 @@ class AudioConferenceClient {
             case 'capacity-update':
                 this.handleCapacityUpdate(message.data);
                 break;
+            // Competition message types
+            case 'competition-created':
+            case 'competition-updated':
+            case 'player-ready':
+            case 'competition-started':
+            case 'next-question':
+            case 'answer-submitted':
+            case 'competition-finished':
+                this.handleCompetitionMessage(message);
+                break;
         }
     }
 
     async handlePeerJoined(data) {
         this.showMessage(`${data.username} joined the conference`, 'success');
         this.loadPeers();
+        this.updateCompetitionVisibility(); // Check if competition portal should be shown
         
         // Implement peer ID-based offer collision resolution
         // Only the peer with the lexicographically smaller ID creates the offer
@@ -1026,6 +1114,7 @@ class AudioConferenceClient {
         // Update UI immediately
         this.updateRemoteParticipants();
         this.loadPeers(); // Refresh peer count
+        this.updateCompetitionVisibility(); // Check if competition portal should be shown
         
         // Refresh room list to update participant counts for other rooms too
         setTimeout(() => this.loadAvailableRooms(), 500);
@@ -2145,6 +2234,80 @@ class AudioConferenceClient {
 
         // Disable username input when connected
         this.usernameInput.disabled = this.isConnected;
+        
+        // Update competition portal visibility
+        this.updateCompetitionVisibility();
+    }
+    
+    selectTeam(team) {
+        this.playerTeam = team;
+        
+        // Update button states
+        this.selectTeamABtn.classList.remove('selected');
+        this.selectTeamBBtn.classList.remove('selected');
+        
+        if (team === 'A') {
+            this.selectTeamABtn.classList.add('selected');
+        } else {
+            this.selectTeamBBtn.classList.add('selected');
+        }
+        
+        // Enable ready button and update text
+        this.readyBtn.disabled = false;
+        this.readyBtn.textContent = "I'm Ready";
+        
+        this.showMessage(`You selected Team ${team}! Click "I'm Ready" to join the competition.`, 'success');
+    }
+    
+    async handleReadyClick() {
+        if (!this.playerTeam) {
+            this.showMessage('Please select a team first!', 'error');
+            return;
+        }
+        
+        if (this.isPlayerReady) {
+            this.showMessage('You are already ready!', 'info');
+            return;
+        }
+        
+        try {
+            // First join/create competition with selected team
+            if (!this.currentGameId) {
+                await this.joinCompetition();
+            }
+            
+            // Then set player as ready
+            await this.setPlayerReady();
+            
+        } catch (error) {
+            console.error('Error handling ready click:', error);
+            this.showMessage('Error joining competition', 'error');
+        }
+    }
+    
+    async joinCompetition() {
+        const response = await fetch(this.apiBase + 'api.php?action=create_competition', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                roomId: this.roomId,
+                peerId: this.peerId,
+                selectedTeam: this.playerTeam
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            this.currentGameId = result.data.gameId;
+            this.displayTeams(result.data.teams);
+        } else {
+            // Provide a more helpful error message
+            let errorMessage = result.error || 'Failed to join competition';
+            if (errorMessage.includes('Peer not found in room')) {
+                errorMessage = 'You must join the room before starting a competition. Please click "Join Room" first.';
+            }
+            throw new Error(errorMessage);
+        }
     }
 
     showMessage(message, type = 'info') {
@@ -2337,6 +2500,419 @@ class AudioConferenceClient {
                 await this.joinRoom(roomId);
             });
         });
+    }
+    
+    // Competition Methods
+    
+    bindCompetitionEvents() {
+        this.readyBtn.addEventListener('click', () => this.handleReadyClick());
+        this.submitAnswerBtn.addEventListener('click', () => this.submitAnswer());
+        this.nextQuestionBtn.addEventListener('click', () => this.nextQuestion());
+        this.newCompetitionBtn.addEventListener('click', () => this.resetCompetition());
+        
+        // Team selection events
+        this.selectTeamABtn.addEventListener('click', () => this.selectTeam('A'));
+        this.selectTeamBBtn.addEventListener('click', () => this.selectTeam('B'));
+    }
+    
+    updateCompetitionVisibility() {
+        const peersCount = this.existingPeers.length + (this.isConnected ? 1 : 0);
+        // Show competition portal when connected to room (no minimum player requirement)
+        if (this.isConnected) {
+            this.competitionPortal.classList.add('active');
+        } else {
+            this.competitionPortal.classList.remove('active');
+            this.resetCompetitionUI();
+        }
+    }
+    
+    async startCompetition() {
+        // This method is no longer used - functionality moved to handleReadyClick
+        console.log('startCompetition called - redirecting to handleReadyClick');
+        await this.handleReadyClick();
+    }
+    
+    async setPlayerReady() {
+        if (!this.currentGameId) return;
+        
+        try {
+            const response = await fetch(this.apiBase + 'api.php?action=player_ready', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gameId: this.currentGameId,
+                    peerId: this.peerId,
+                    roomId: this.roomId
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                this.isPlayerReady = true;
+                this.readyBtn.classList.add('ready');
+                this.readyBtn.textContent = 'Ready!';
+                this.readyBtn.disabled = true;
+                
+                if (result.data.allReady) {
+                    this.loadQuestions();
+                } else {
+                    this.showMessage('Waiting for other players...', 'info');
+                }
+            } else {
+                this.showMessage('Failed to set ready status: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error setting player ready:', error);
+            this.showMessage('Error setting ready status', 'error');
+        }
+    }
+    
+    async loadQuestions() {
+        try {
+            const response = await fetch(this.apiBase + 'api.php?action=get_questions');
+            const result = await response.json();
+            
+            if (result.success) {
+                this.currentQuestions = result.data.questions;
+                this.showMessage('Competition starting!', 'success');
+                this.competitionPortal.style.display = 'none';
+                this.questionDisplay.classList.add('active');
+                this.currentScoreboard.style.display = 'block';
+            } else {
+                this.showMessage('Failed to load questions: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error loading questions:', error);
+            this.showMessage('Error loading questions', 'error');
+        }
+    }
+    
+    displayTeams(teams) {
+        this.teamAMembers.innerHTML = '';
+        this.teamBMembers.innerHTML = '';
+        
+        teams.forEach(member => {
+            const li = document.createElement('li');
+            li.className = 'team-member';
+            
+            const statusClass = member.is_ready ? 'ready' : 'waiting';
+            const statusText = member.is_ready ? 'Ready' : 'Waiting';
+            
+            li.innerHTML = `
+                <span>${member.username || member.peer_id}</span>
+                <span class="member-status ${statusClass}">${statusText}</span>
+            `;
+            
+            if (member.team === 'A') {
+                this.teamAMembers.appendChild(li);
+            } else {
+                this.teamBMembers.appendChild(li);
+            }
+            
+            if (member.peer_id === this.peerId) {
+                this.playerTeam = member.team;
+            }
+        });
+        
+        this.teamsDisplay.style.display = 'grid';
+        this.scoreboard.style.display = 'block';
+    }
+    
+    displayQuestion(questionIndex, currentTeam, gameState) {
+        if (questionIndex >= this.currentQuestions.length) {
+            this.showGameResults();
+            return;
+        }
+        
+        const question = this.currentQuestions[questionIndex];
+        const isMyTeamTurn = currentTeam === this.playerTeam;
+        
+        // Update header
+        this.questionNumber.textContent = `Question ${questionIndex + 1}/14`;
+        this.currentTeamDisplay.textContent = `Team ${currentTeam}'s Turn`;
+        this.currentTeamDisplay.className = `current-team team-${currentTeam.toLowerCase()}`;
+        
+        // Update content
+        this.questionContent.textContent = question.question;
+        
+        // Generate options
+        this.optionsGrid.innerHTML = '';
+        question.options.forEach((option, index) => {
+            const button = document.createElement('button');
+            button.className = 'option-button';
+            button.textContent = option;
+            button.onclick = () => this.selectOption(button, option);
+            
+            // Only enable for current team
+            if (!isMyTeamTurn) {
+                button.disabled = true;
+                button.style.opacity = '0.6';
+            }
+            
+            this.optionsGrid.appendChild(button);
+        });
+        
+        // Update scores
+        this.currentTeamAScore.textContent = gameState.team_a_score || 0;
+        this.currentTeamBScore.textContent = gameState.team_b_score || 0;
+        
+        // Reset submit button
+        this.submitAnswerBtn.disabled = !isMyTeamTurn;
+        this.selectedAnswer = null;
+        
+        // Start timer
+        this.startQuestionTimer();
+        
+        // Show explanation for non-playing team
+        if (!isMyTeamTurn) {
+            this.showMessage(`Team ${currentTeam} is answering. You can see the question and options but cannot answer.`, 'info');
+        } else {
+            this.showMessage(`Your turn! Select an answer and submit within 1 minute.`, 'info');
+        }
+    }
+    
+    selectOption(button, option) {
+        // Clear previous selection
+        document.querySelectorAll('.option-button').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        
+        // Set new selection
+        button.classList.add('selected');
+        this.selectedAnswer = option;
+        this.submitAnswerBtn.disabled = false;
+    }
+    
+    async submitAnswer() {
+        if (!this.selectedAnswer || !this.currentGameId) return;
+        
+        const currentQuestion = this.currentQuestions[this.getCurrentQuestionIndex()];
+        
+        try {
+            const response = await fetch(this.apiBase + 'api.php?action=submit_answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gameId: this.currentGameId,
+                    peerId: this.peerId,
+                    roomId: this.roomId,
+                    selectedAnswer: this.selectedAnswer,
+                    questionIndex: this.getCurrentQuestionIndex(),
+                    correctAnswer: currentQuestion.correct_answer
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                this.submitAnswerBtn.disabled = true;
+                this.showMessage(result.data.isCorrect ? 'Correct answer!' : 'Incorrect answer.', 
+                    result.data.isCorrect ? 'success' : 'error');
+            } else {
+                this.showMessage('Failed to submit answer: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error submitting answer:', error);
+            this.showMessage('Error submitting answer', 'error');
+        }
+    }
+    
+    startQuestionTimer() {
+        let timeLeft = 60; // 1 minute
+        this.timerDisplay.textContent = this.formatTime(timeLeft);
+        
+        if (this.gameTimer) {
+            clearInterval(this.gameTimer);
+        }
+        
+        this.gameTimer = setInterval(() => {
+            timeLeft--;
+            this.timerDisplay.textContent = this.formatTime(timeLeft);
+            
+            if (timeLeft <= 0) {
+                clearInterval(this.gameTimer);
+                this.timerDisplay.textContent = '0:00';
+                this.showTimeUpResults();
+            }
+        }, 1000);
+    }
+    
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    showTimeUpResults() {
+        const currentQuestion = this.currentQuestions[this.getCurrentQuestionIndex()];
+        
+        // Show correct answer
+        document.querySelectorAll('.option-button').forEach(btn => {
+            if (btn.textContent === currentQuestion.correct_answer) {
+                btn.classList.add('correct');
+            } else if (btn.classList.contains('selected')) {
+                btn.classList.add('incorrect');
+            }
+            btn.disabled = true;
+        });
+        
+        this.submitAnswerBtn.style.display = 'none';
+        this.nextQuestionBtn.style.display = 'block';
+        
+        this.showMessage('Time\'s up! See the correct answer highlighted in green.', 'info');
+    }
+    
+    async nextQuestion() {
+        if (!this.currentGameId) return;
+        
+        try {
+            const response = await fetch(this.apiBase + 'api.php?action=next_question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gameId: this.currentGameId,
+                    roomId: this.roomId
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                if (result.data.results) {
+                    // Competition finished
+                    this.showGameResults(result.data.results);
+                } else {
+                    // Continue to next question
+                    this.nextQuestionBtn.style.display = 'none';
+                    this.submitAnswerBtn.style.display = 'block';
+                    // Question will be updated via SSE
+                }
+            } else {
+                this.showMessage('Failed to proceed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error proceeding to next question:', error);
+            this.showMessage('Error proceeding to next question', 'error');
+        }
+    }
+    
+    getCurrentQuestionIndex() {
+        // This would be updated via SSE events
+        return parseInt(this.questionNumber.textContent.split('/')[0].replace('Question ', '')) - 1;
+    }
+    
+    showGameResults(results) {
+        if (this.gameTimer) {
+            clearInterval(this.gameTimer);
+        }
+        
+        this.questionDisplay.classList.remove('active');
+        this.resultsDisplay.classList.add('active');
+        
+        const teamAScore = results?.game?.team_a_score || 0;
+        const teamBScore = results?.game?.team_b_score || 0;
+        
+        this.finalTeamAScore.textContent = teamAScore;
+        this.finalTeamBScore.textContent = teamBScore;
+        
+        let winner = 'It\'s a tie!';
+        if (teamAScore > teamBScore) {
+            winner = 'Team A Wins! 🎉';
+        } else if (teamBScore > teamAScore) {
+            winner = 'Team B Wins! 🎉';
+        }
+        
+        this.winnerAnnouncement.textContent = winner;
+        this.showMessage('Competition finished! Check the final results.', 'success');
+    }
+    
+    resetCompetition() {
+        this.currentGameId = null;
+        this.isPlayerReady = false;
+        this.playerTeam = null;
+        this.selectedAnswer = null;
+        
+        if (this.gameTimer) {
+            clearInterval(this.gameTimer);
+        }
+        
+        this.resetCompetitionUI();
+        this.competitionPortal.classList.add('active');
+        this.showMessage('Ready for a new competition!', 'info');
+    }
+    
+    resetCompetitionUI() {
+        this.readyBtn.disabled = true;
+        this.readyBtn.classList.remove('ready');
+        this.readyBtn.textContent = 'Select Team First';
+        this.gameStatus.textContent = 'Select a team and click "I\'m Ready" to join competition';
+        this.teamsDisplay.style.display = 'none';
+        this.scoreboard.style.display = 'none';
+        this.questionDisplay.classList.remove('active');
+        this.resultsDisplay.classList.remove('active');
+        this.currentScoreboard.style.display = 'none';
+        this.nextQuestionBtn.style.display = 'none';
+        this.submitAnswerBtn.style.display = 'block';
+        
+        // Reset team selection
+        this.playerTeam = null;
+        this.isPlayerReady = false;
+        this.selectTeamABtn.classList.remove('selected');
+        this.selectTeamBBtn.classList.remove('selected');
+    }
+    
+    handleCompetitionMessage(data) {
+        switch (data.type) {
+            case 'competition-created':
+            case 'competition-updated':
+                this.currentGameId = data.gameId;
+                this.displayTeams(data.teams);
+                this.gameStatus.textContent = data.message;
+                break;
+                
+            case 'player-ready':
+                // Update team display with ready status
+                this.displayTeams(data.teams);
+                break;
+                
+            case 'competition-started':
+                this.loadQuestions();
+                break;
+                
+            case 'next-question':
+                this.displayQuestion(data.questionIndex, data.currentTeam, {
+                    team_a_score: data.teamAScore,
+                    team_b_score: data.teamBScore
+                });
+                break;
+                
+            case 'answer-submitted':
+                this.showAnswerResult(data);
+                break;
+                
+            case 'competition-finished':
+                this.showGameResults(data.results);
+                break;
+        }
+    }
+    
+    showAnswerResult(data) {
+        // Show correct answer and update UI
+        document.querySelectorAll('.option-button').forEach(btn => {
+            if (btn.textContent === data.correctAnswer) {
+                btn.classList.add('correct');
+            } else if (btn.textContent === data.selectedAnswer && !data.isCorrect) {
+                btn.classList.add('incorrect');
+            }
+            btn.disabled = true;
+        });
+        
+        this.submitAnswerBtn.style.display = 'none';
+        this.nextQuestionBtn.style.display = 'block';
+        
+        const message = data.isCorrect ? 
+            `Team ${data.team} got it right! +1 point` : 
+            `Team ${data.team} got it wrong. Correct answer: ${data.correctAnswer}`;
+            
+        this.showMessage(message, data.isCorrect ? 'success' : 'error');
     }
 }
 

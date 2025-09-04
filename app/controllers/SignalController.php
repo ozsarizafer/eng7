@@ -66,6 +66,28 @@ class SignalController {
                 case 'unlock':
                     $this->handleDatabaseUnlock();
                     break;
+                // Competition endpoints
+                case 'create_competition':
+                    $this->handleCreateCompetition();
+                    break;
+                case 'player_ready':
+                    $this->handlePlayerReady();
+                    break;
+                case 'get_game_state':
+                    $this->handleGetGameState();
+                    break;
+                case 'submit_answer':
+                    $this->handleSubmitAnswer();
+                    break;
+                case 'next_question':
+                    $this->handleNextQuestion();
+                    break;
+                case 'get_questions':
+                    $this->handleGetQuestions();
+                    break;
+                case 'get_results':
+                    $this->handleGetResults();
+                    break;
                 default:
                     $this->sendError('Invalid action', 400);
             }
@@ -565,6 +587,285 @@ class SignalController {
             }
         } catch (Exception $e) {
             error_log("Failed to broadcast room list update: " . $e->getMessage());
+        }
+    }
+    
+    // Competition handler methods
+    
+    private function handleCreateCompetition() {
+        $input = $this->getJsonInput();
+        $roomId = $input['roomId'] ?? '';
+        $peerId = $input['peerId'] ?? '';
+        $selectedTeam = $input['selectedTeam'] ?? '';
+        
+        if (empty($roomId) || empty($peerId) || empty($selectedTeam)) {
+            $this->sendError('Room ID, Peer ID, and selected team are required', 400);
+            return;
+        }
+        
+        try {
+            // Check if peer exists in the room
+            $roomPeers = $this->signal->getRoomPeers($roomId);
+            $peerExists = false;
+            foreach ($roomPeers as $peer) {
+                if ($peer['peer_id'] === $peerId) {
+                    $peerExists = true;
+                    break;
+                }
+            }
+            
+            if (!$peerExists) {
+                $this->sendError('Peer not found in room. Please join the room first.', 400);
+                return;
+            }
+            
+            // Get or create competition game for this room
+            $existingGame = $this->signal->getCompetitionGame($roomId);
+            
+            if (!$existingGame || $existingGame['game_state'] === 'finished') {
+                // Create new competition game
+                $gameId = $this->signal->createCompetitionGame($roomId);
+            } else {
+                $gameId = $existingGame['id'];
+            }
+            
+            // Add this player to selected team
+            $this->signal->assignPlayerToTeam($gameId, $peerId, $selectedTeam);
+            
+            // Get current team assignments
+            $teams = $this->signal->getTeamAssignments($gameId);
+            
+            // Broadcast competition state to all room members
+            $this->signal->broadcastToRoom($roomId, 'system', 'competition-updated', [
+                'gameId' => $gameId,
+                'teams' => $teams,
+                'message' => 'Player joined competition. Select your team and click "I\'m Ready"!'
+            ]);
+            
+            $this->sendSuccess([
+                'message' => 'Joined competition successfully',
+                'gameId' => $gameId,
+                'teams' => $teams
+            ]);
+            
+        } catch (Exception $e) {
+            $this->sendError('Failed to create competition: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handlePlayerReady() {
+        $input = $this->getJsonInput();
+        $gameId = $input['gameId'] ?? '';
+        $peerId = $input['peerId'] ?? '';
+        $roomId = $input['roomId'] ?? '';
+        
+        if (empty($gameId) || empty($peerId)) {
+            $this->sendError('Game ID and Peer ID are required', 400);
+            return;
+        }
+        
+        try {
+            // Set player as ready
+            $this->signal->setPlayerReady($gameId, $peerId);
+            
+            // Check if all players are ready
+            $allReady = $this->signal->checkAllPlayersReady($gameId);
+            
+            if ($allReady) {
+                // Start the competition
+                $this->signal->startCompetition($gameId);
+                
+                // Broadcast game start
+                $this->signal->broadcastToRoom($roomId, 'system', 'competition-started', [
+                    'gameId' => $gameId,
+                    'message' => 'All players ready! Competition starting...',
+                    'currentTeam' => 'A',
+                    'questionIndex' => 0
+                ]);
+            } else {
+                // Broadcast ready status update
+                $teams = $this->signal->getTeamAssignments($gameId);
+                $this->signal->broadcastToRoom($roomId, 'system', 'player-ready', [
+                    'peerId' => $peerId,
+                    'teams' => $teams
+                ]);
+            }
+            
+            $this->sendSuccess([
+                'message' => 'Player marked as ready',
+                'allReady' => $allReady
+            ]);
+            
+        } catch (Exception $e) {
+            $this->sendError('Failed to mark player ready: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleGetGameState() {
+        $gameId = $_GET['gameId'] ?? '';
+        
+        if (empty($gameId)) {
+            $this->sendError('Game ID is required', 400);
+            return;
+        }
+        
+        try {
+            $gameState = $this->signal->getCurrentGameState($gameId);
+            $teams = $this->signal->getTeamAssignments($gameId);
+            
+            $this->sendSuccess([
+                'gameState' => $gameState,
+                'teams' => $teams
+            ]);
+            
+        } catch (Exception $e) {
+            $this->sendError('Failed to get game state: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleSubmitAnswer() {
+        $input = $this->getJsonInput();
+        $gameId = $input['gameId'] ?? '';
+        $peerId = $input['peerId'] ?? '';
+        $roomId = $input['roomId'] ?? '';
+        $selectedAnswer = $input['selectedAnswer'] ?? '';
+        $questionIndex = $input['questionIndex'] ?? 0;
+        $correctAnswer = $input['correctAnswer'] ?? '';
+        
+        if (empty($gameId) || empty($peerId) || empty($selectedAnswer)) {
+            $this->sendError('Game ID, Peer ID, and selected answer are required', 400);
+            return;
+        }
+        
+        try {
+            // Get team assignment for this peer
+            $teams = $this->signal->getTeamAssignments($gameId);
+            $currentTeam = null;
+            
+            foreach ($teams as $team) {
+                if ($team['peer_id'] === $peerId) {
+                    $currentTeam = $team['team'];
+                    break;
+                }
+            }
+            
+            if (!$currentTeam) {
+                $this->sendError('Player not found in any team', 400);
+                return;
+            }
+            
+            // Check if answer is correct
+            $isCorrect = $selectedAnswer === $correctAnswer;
+            
+            // Submit answer
+            $this->signal->submitAnswer($gameId, $questionIndex, $currentTeam, $selectedAnswer, $isCorrect);
+            
+            // Update score if correct
+            if ($isCorrect) {
+                $this->signal->updateGameScore($gameId, $currentTeam);
+            }
+            
+            // Broadcast answer submission
+            $this->signal->broadcastToRoom($roomId, 'system', 'answer-submitted', [
+                'team' => $currentTeam,
+                'selectedAnswer' => $selectedAnswer,
+                'correctAnswer' => $correctAnswer,
+                'isCorrect' => $isCorrect,
+                'questionIndex' => $questionIndex
+            ]);
+            
+            $this->sendSuccess([
+                'message' => 'Answer submitted successfully',
+                'isCorrect' => $isCorrect
+            ]);
+            
+        } catch (Exception $e) {
+            $this->sendError('Failed to submit answer: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleNextQuestion() {
+        $input = $this->getJsonInput();
+        $gameId = $input['gameId'] ?? '';
+        $roomId = $input['roomId'] ?? '';
+        
+        if (empty($gameId)) {
+            $this->sendError('Game ID is required', 400);
+            return;
+        }
+        
+        try {
+            $gameState = $this->signal->getCurrentGameState($gameId);
+            
+            if ($gameState['current_question_index'] >= 13) {
+                // Game finished (14 questions total: 0-13)
+                $this->signal->nextQuestion($gameId);
+                
+                $results = $this->signal->getGameResults($gameId);
+                
+                $this->signal->broadcastToRoom($roomId, 'system', 'competition-finished', [
+                    'results' => $results,
+                    'message' => 'Competition finished! Check the final scores.'
+                ]);
+                
+                $this->sendSuccess([
+                    'message' => 'Competition finished',
+                    'results' => $results
+                ]);
+            } else {
+                // Next question
+                $this->signal->nextQuestion($gameId);
+                $newGameState = $this->signal->getCurrentGameState($gameId);
+                
+                $this->signal->broadcastToRoom($roomId, 'system', 'next-question', [
+                    'currentTeam' => $newGameState['current_team'],
+                    'questionIndex' => $newGameState['current_question_index'],
+                    'teamAScore' => $newGameState['team_a_score'],
+                    'teamBScore' => $newGameState['team_b_score']
+                ]);
+                
+                $this->sendSuccess([
+                    'message' => 'Next question ready',
+                    'gameState' => $newGameState
+                ]);
+            }
+            
+        } catch (Exception $e) {
+            $this->sendError('Failed to proceed to next question: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleGetQuestions() {
+        try {
+            $questions = $this->signal->loadQuestions();
+            
+            $this->sendSuccess([
+                'questions' => $questions,
+                'total' => count($questions)
+            ]);
+            
+        } catch (Exception $e) {
+            $this->sendError('Failed to load questions: ' . $e->getMessage(), 500);
+        }
+    }
+    
+    private function handleGetResults() {
+        $gameId = $_GET['gameId'] ?? '';
+        
+        if (empty($gameId)) {
+            $this->sendError('Game ID is required', 400);
+            return;
+        }
+        
+        try {
+            $results = $this->signal->getGameResults($gameId);
+            
+            $this->sendSuccess([
+                'results' => $results
+            ]);
+            
+        } catch (Exception $e) {
+            $this->sendError('Failed to get results: ' . $e->getMessage(), 500);
         }
     }
 }

@@ -368,4 +368,138 @@ class Signal {
             throw $e;
         }
     }
+
+    // Competition-related methods
+    
+    public function createCompetitionGame($roomId) {
+        $sql = "INSERT INTO competition_games (room_id, game_state, created_at) VALUES (?, 'waiting', CURRENT_TIMESTAMP)";
+        $stmt = $this->db->query($sql, [$roomId]);
+        return $this->db->lastInsertId();
+    }
+    
+    public function getCompetitionGame($roomId) {
+        $sql = "SELECT * FROM competition_games WHERE room_id = ? ORDER BY created_at DESC LIMIT 1";
+        $stmt = $this->db->query($sql, [$roomId]);
+        return $stmt->fetch();
+    }
+    
+    public function assignTeams($gameId, $peerIds) {
+        // Auto-assign teams: first 2 to Team A, next 2 to Team B
+        $teams = ['A', 'A', 'B', 'B'];
+        
+        for ($i = 0; $i < count($peerIds) && $i < 4; $i++) {
+            $sql = "INSERT INTO team_assignments (game_id, peer_id, team, is_ready) VALUES (?, ?, ?, 0)";
+            $this->db->query($sql, [$gameId, $peerIds[$i], $teams[$i]]);
+        }
+        
+        return true;
+    }
+    
+    public function assignPlayerToTeam($gameId, $peerId, $team) {
+        // Check if player is already assigned to a team
+        $sql = "SELECT * FROM team_assignments WHERE game_id = ? AND peer_id = ?";
+        $stmt = $this->db->query($sql, [$gameId, $peerId]);
+        $existing = $stmt->fetch();
+        
+        if ($existing) {
+            // Update existing assignment
+            $sql = "UPDATE team_assignments SET team = ?, is_ready = 0 WHERE game_id = ? AND peer_id = ?";
+            return $this->db->query($sql, [$team, $gameId, $peerId]);
+        } else {
+            // Create new assignment
+            $sql = "INSERT INTO team_assignments (game_id, peer_id, team, is_ready) VALUES (?, ?, ?, 0)";
+            return $this->db->query($sql, [$gameId, $peerId, $team]);
+        }
+    }
+    
+    public function setPlayerReady($gameId, $peerId) {
+        $sql = "UPDATE team_assignments SET is_ready = 1 WHERE game_id = ? AND peer_id = ?";
+        return $this->db->query($sql, [$gameId, $peerId]);
+    }
+    
+    public function getTeamAssignments($gameId) {
+        $sql = "SELECT ta.*, p.username FROM team_assignments ta 
+                LEFT JOIN peers p ON ta.peer_id = p.peer_id 
+                WHERE ta.game_id = ? ORDER BY ta.team, ta.id";
+        $stmt = $this->db->query($sql, [$gameId]);
+        return $stmt->fetchAll();
+    }
+    
+    public function checkAllPlayersReady($gameId) {
+        $sql = "SELECT COUNT(*) as total, SUM(is_ready) as ready FROM team_assignments WHERE game_id = ?";
+        $stmt = $this->db->query($sql, [$gameId]);
+        $result = $stmt->fetch();
+        
+        // Allow game to start with at least 2 players ready (1 per team minimum)
+        return $result['total'] >= 2 && $result['ready'] == $result['total'];
+    }
+    
+    public function startCompetition($gameId) {
+        $sql = "UPDATE competition_games SET game_state = 'playing', question_start_time = CURRENT_TIMESTAMP WHERE id = ?";
+        return $this->db->query($sql, [$gameId]);
+    }
+    
+    public function getCurrentGameState($gameId) {
+        $sql = "SELECT * FROM competition_games WHERE id = ?";
+        $stmt = $this->db->query($sql, [$gameId]);
+        return $stmt->fetch();
+    }
+    
+    public function submitAnswer($gameId, $questionIndex, $team, $selectedAnswer, $isCorrect) {
+        $sql = "INSERT INTO question_answers (game_id, question_index, team, selected_answer, is_correct, answered_at) 
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)";
+        return $this->db->query($sql, [$gameId, $questionIndex, $team, $selectedAnswer, $isCorrect ? 1 : 0]);
+    }
+    
+    public function updateGameScore($gameId, $team) {
+        $column = $team === 'A' ? 'team_a_score' : 'team_b_score';
+        $sql = "UPDATE competition_games SET $column = $column + 1 WHERE id = ?";
+        return $this->db->query($sql, [$gameId]);
+    }
+    
+    public function nextQuestion($gameId, $nextTeam = null) {
+        $game = $this->getCurrentGameState($gameId);
+        $nextIndex = $game['current_question_index'] + 1;
+        
+        if ($nextTeam === null) {
+            $nextTeam = $game['current_team'] === 'A' ? 'B' : 'A';
+        }
+        
+        if ($nextIndex >= 14) { // Total 14 questions (7 per team)
+            // Game finished
+            $sql = "UPDATE competition_games SET game_state = 'finished', finished_at = CURRENT_TIMESTAMP WHERE id = ?";
+            return $this->db->query($sql, [$gameId]);
+        } else {
+            // Next question
+            $sql = "UPDATE competition_games SET current_question_index = ?, current_team = ?, question_start_time = CURRENT_TIMESTAMP WHERE id = ?";
+            return $this->db->query($sql, [$nextIndex, $nextTeam, $gameId]);
+        }
+    }
+    
+    public function getGameResults($gameId) {
+        $sql = "SELECT * FROM competition_games WHERE id = ?";
+        $stmt = $this->db->query($sql, [$gameId]);
+        $game = $stmt->fetch();
+        
+        $sql = "SELECT team, COUNT(*) as correct_answers FROM question_answers 
+                WHERE game_id = ? AND is_correct = 1 GROUP BY team";
+        $stmt = $this->db->query($sql, [$gameId]);
+        $teamScores = $stmt->fetchAll();
+        
+        return [
+            'game' => $game,
+            'team_scores' => $teamScores,
+            'teams' => $this->getTeamAssignments($gameId)
+        ];
+    }
+    
+    public function loadQuestions() {
+        $questionsFile = __DIR__ . '/../../data/questions.json';
+        if (file_exists($questionsFile)) {
+            $content = file_get_contents($questionsFile);
+            $data = json_decode($content, true);
+            return $data['questions'] ?? [];
+        }
+        return [];
+    }
 }

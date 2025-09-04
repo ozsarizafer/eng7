@@ -1,0 +1,235 @@
+{
+    "questions": [
+        {
+            "question": "Which phrase appears at the beginning of almost every chapter (surah) in the Qur'an?",
+            "options": ["Inna lillahi wa inna ilayhi raji'un", "Bismillahirrahmanirrahim", "Allahu Akbar", "La ilaha illallah"],
+            "correct_answer": "Bismillahirrahmanirrahim",
+            "category": "religion",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which animal is known as the fastest land animal?",
+            "options": ["Lion", "Tiger", "Cheetah", "Leopard"],
+            "correct_answer": "Cheetah",
+            "category": "animals",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which is the largest desert in the world?",
+            "options": ["Gobi Desert", "Sahara Desert", "Antarctic Desert", "Kalahari Desert"],
+            "correct_answer": "Antarctic Desert",
+            "category": "geography",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which organ in the human body pumps blood throughout the body?",
+            "options": ["Brain", "Lungs", "Heart", "Kidneys"],
+            "correct_answer": "Heart",
+            "category": "biology",
+            "difficulty": "easy"
+        },
+        {
+            "question": "What symbol is often used to represent justice in many cultures?",
+            "options": ["A sword", "A scale", "A crown", "A book"],
+            "correct_answer": "A scale",
+            "category": "culture",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which country is famous for inventing pizza?",
+            "options": ["Spain", "Italy", "France", "Turkey"],
+            "correct_answer": "Italy",
+            "category": "food",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which planet is known as the 'Red Planet'?",
+            "options": ["Jupiter", "Venus", "Mars", "Saturn"],
+            "correct_answer": "Mars",
+            "category": "space",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which animal is known as the king of the jungle?",
+            "options": ["Tiger", "Lion", "Elephant", "Leopard"],
+            "correct_answer": "Lion",
+            "category": "animals",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which bird is famous for its ability to mimic human speech?",
+            "options": ["Crow", "Parrot", "Owl", "Sparrow"],
+            "correct_answer": "Parrot",
+            "category": "animals",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which animal lays the largest eggs?",
+            "options": ["Ostrich", "Chicken", "Turtle", "Eagle"],
+            "correct_answer": "Ostrich",
+            "category": "animals",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which sea creature has eight arms?",
+            "options": ["Squid", "Shark", "Octopus", "Seal"],
+            "correct_answer": "Octopus",
+            "category": "animals",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which is the largest continent on Earth?",
+            "options": ["Africa", "Asia", "Europe", "South America"],
+            "correct_answer": "Asia",
+            "category": "geography",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which country has the longest coastline in the world?",
+            "options": ["Australia", "Canada", "Russia", "USA"],
+            "correct_answer": "Canada",
+            "category": "geography",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Mount Everest is located in which mountain range?",
+            "options": ["Andes", "Himalayas", "Rockies", "Alps"],
+            "correct_answer": "Himalayas",
+            "category": "geography",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which ocean is the smallest by area?",
+            "options": ["Indian Ocean", "Arctic Ocean", "Atlantic Ocean", "Pacific Ocean"],
+            "correct_answer": "Arctic Ocean",
+            "category": "geography",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which organ helps humans breathe?",
+            "options": ["Heart", "Brain", "Lungs", "Kidneys"],
+            "correct_answer": "Lungs",
+            "category": "biology",
+            "difficulty": "easy"
+        },
+        {
+            "question": "What is the strongest muscle in the human body based on size?",
+            "options": ["Tongue", "Heart", "Jaw (Masseter)", "Leg (Quadriceps)"],
+            "correct_answer": "Jaw (Masseter)",
+            "category": "biology",
+            "difficulty": "hard"
+        },
+        {
+            "question": "Which part of the human body contains the most bones?",
+            "options": ["Hand", "Foot", "Spine", "Skull"],
+            "correct_answer": "Hand",
+            "category": "biology",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which blood type is known as the universal donor?",
+            "options": ["A", "B", "AB", "O negative"],
+            "correct_answer": "O negative",
+            "category": "biology",
+            "difficulty": "hard"
+        },
+        {
+            "question": "What object is traditionally held by Lady Justice in one hand?",
+            "options": ["A sword", "A scale", "A book", "A crown"],
+            "correct_answer": "A scale",
+            "category": "culture",
+            "difficulty": "easy"
+        },
+        {
+            "question": "In many courthouses, what is Lady Justice often standing on?",
+            "options": ["Clouds", "A snake", "A pedestal", "A mountain"],
+            "correct_answer": "A pedestal",
+            "category": "culture",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which Roman goddess inspired the symbol of justice?",
+            "options": ["Venus", "Justitia", "Minerva", "Diana"],
+            "correct_answer": "Justitia",
+            "category": "culture",
+            "difficulty": "hard"
+        },
+        {
+            "question": "Which phrase is commonly engraved on courthouses in the United States?",
+            "options": ["Truth and Justice", "Equal Justice Under Law", "Law and Order", "Justice for All"],
+            "correct_answer": "Equal Justice Under Law",
+            "category": "culture",
+            "difficulty": "hard"
+        },
+        {
+            "question": "Which country is famous for inventing pasta?",
+            "options": ["France", "China", "Italy", "Turkey"],
+            "correct_answer": "Italy",
+            "category": "food",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Guacamole is a traditional dip made from which fruit?",
+            "options": ["Tomato", "Avocado", "Cucumber", "Olive"],
+            "correct_answer": "Avocado",
+            "category": "food",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which grain is the main ingredient in bread?",
+            "options": ["Corn", "Wheat", "Rice", "Oats"],
+            "correct_answer": "Wheat",
+            "category": "food",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which country is known for the dish Paella?",
+            "options": ["Spain", "Italy", "Greece", "Portugal"],
+            "correct_answer": "Spain",
+            "category": "food",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which type of nut is used to make marzipan?",
+            "options": ["Almond", "Peanut", "Cashew", "Walnut"],
+            "correct_answer": "Almond",
+            "category": "food",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which planet has the most moons?",
+            "options": ["Jupiter", "Saturn", "Mars", "Neptune"],
+            "correct_answer": "Saturn",
+            "category": "space",
+            "difficulty": "medium"
+        },
+        {
+            "question": "Which planet is closest to the Sun?",
+            "options": ["Mercury", "Venus", "Earth", "Mars"],
+            "correct_answer": "Mercury",
+            "category": "space",
+            "difficulty": "easy"
+        },
+        {
+            "question": "What is the name of our galaxy?",
+            "options": ["Andromeda", "Milky Way", "Whirlpool", "Sombrero"],
+            "correct_answer": "Milky Way",
+            "category": "space",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which planet is famous for its rings?",
+            "options": ["Neptune", "Jupiter", "Saturn", "Uranus"],
+            "correct_answer": "Saturn",
+            "category": "space",
+            "difficulty": "easy"
+        },
+        {
+            "question": "Which planet is the smallest in our solar system?",
+            "options": ["Mercury", "Mars", "Venus", "Pluto"],
+            "correct_answer": "Mercury",
+            "category": "space",
+            "difficulty": "medium"
+        }
+    ]
+}

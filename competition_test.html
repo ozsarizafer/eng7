@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competition Test - 4 Users Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #28a745;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #17a2b8;
+            background: #d6eaef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        #results {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🏆 Competition Portal Test</h1>
+        <p>This tool simulates 4 users joining a room and tests the competition functionality.</p>
+        
+        <div class="test-section">
+            <h3>🏠 Step 1: Room Setup</h3>
+            <button onclick="createTestRoom()">Create Test Room</button>
+            <button onclick="joinRoom4Users()">Simulate 4 Users Joining</button>
+            <button onclick="checkRoomStatus()">Check Room Status</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🎯 Step 2: Competition Flow</h3>
+            <button onclick="createCompetition()">Create Competition</button>
+            <button onclick="setAllReady()">Set All Players Ready</button>
+            <button onclick="testQuestionFlow()">Test Question Flow</button>
+            <button onclick="finishCompetition()">Finish Competition</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧹 Step 3: Cleanup</h3>
+            <button onclick="leaveAllUsers()">Remove All Users</button>
+            <button onclick="resetTest()">Reset Test</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="results">Ready to test competition system...\n</div>
+        </div>
+    </div>
+
+    <script>
+        const apiBase = window.location.origin + window.location.pathname.replace('competition_test.html', '') + 'public/';
+        let testRoomId = null;
+        let gameId = null;
+        let testPeers = [];
+
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            results.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(apiBase + 'api.php' + endpoint, options);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'API call failed');
+                }
+                
+                return result.data;
+            } catch (error) {
+                log(`API Error (${endpoint}): ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        async function createTestRoom() {
+            try {
+                log('Creating test room...');
+                const data = await apiCall('?action=create_room', 'POST', {
+                    roomName: 'Competition Test Room'
+                });
+                
+                testRoomId = data.roomId;
+                log(`Test room created: ${data.roomName} (ID: ${testRoomId})`, 'success');
+                
+            } catch (error) {
+                log(`Failed to create test room: ${error.message}`, 'error');
+            }
+        }
+
+        async function joinRoom4Users() {
+            if (!testRoomId) {
+                log('Please create a test room first', 'error');
+                return;
+            }
+
+            try {
+                log('Simulating 4 users joining the room...');
+                testPeers = [];
+                
+                for (let i = 1; i <= 4; i++) {
+                    const peerId = `test_peer_${i}_${Date.now()}`;
+                    const username = `TestUser${i}`;
+                    
+                    const data = await apiCall('?action=join', 'POST', {
+                        roomId: testRoomId,
+                        peerId: peerId,
+                        username: username
+                    });
+                    
+                    testPeers.push({ peerId, username });
+                    log(`${username} joined (${peerId})`, 'success');
+                    
+                    // Small delay to simulate real joining
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                log(`All 4 users successfully joined room ${testRoomId}`, 'success');
+                
+            } catch (error) {
+                log(`Failed to join users: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkRoomStatus() {
+            if (!testRoomId) {
+                log('No test room available', 'error');
+                return;
+            }
+
+            try {
+                log('Checking room status...');
+                
+                const peersData = await apiCall(`?action=peers&roomId=${testRoomId}`);
+                log(`Room ${testRoomId} has ${peersData.peers.length} participants:`, 'info');
+                
+                peersData.peers.forEach(peer => {
+                    log(`  - ${peer.username || peer.peer_id}`, 'info');
+                });
+                
+            } catch (error) {
+                log(`Failed to check room status: ${error.message}`, 'error');
+            }
+        }
+
+        async function createCompetition() {
+            if (!testRoomId || testPeers.length !== 4) {
+                log('Need exactly 4 users in room to create competition', 'error');
+                return;
+            }
+
+            try {
+                log('Creating competition...');
+                
+                const data = await apiCall('?action=create_competition', 'POST', {
+                    roomId: testRoomId
+                });
+                
+                gameId = data.gameId;
+                log(`Competition created with ID: ${gameId}`, 'success');
+                log('Teams assigned:', 'info');
+                
+                data.teams.forEach(member => {
+                    log(`  Team ${member.team}: ${member.username} (${member.peer_id})`, 'info');
+                });
+                
+            } catch (error) {
+                log(`Failed to create competition: ${error.message}`, 'error');
+            }
+        }
+
+        async function setAllReady() {
+            if (!gameId || testPeers.length !== 4) {
+                log('Need active competition with 4 players', 'error');
+                return;
+            }
+
+            try {
+                log('Setting all players ready...');
+                
+                for (const peer of testPeers) {
+                    const data = await apiCall('?action=player_ready', 'POST', {
+                        gameId: gameId,
+                        peerId: peer.peerId,
+                        roomId: testRoomId
+                    });
+                    
+                    log(`${peer.username} is ready`, 'success');
+                    
+                    if (data.allReady) {
+                        log('All players ready! Competition can start!', 'success');
+                        break;
+                    }
+                    
+                    // Small delay
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+            } catch (error) {
+                log(`Failed to set players ready: ${error.message}`, 'error');
+            }
+        }
+
+        async function testQuestionFlow() {
+            if (!gameId) {
+                log('Need active competition', 'error');
+                return;
+            }
+
+            try {
+                log('Testing question flow...');
+                
+                // Get questions
+                const questionsData = await apiCall('?action=get_questions');
+                log(`Loaded ${questionsData.total} questions for competition`, 'success');
+                
+                // Simulate answering first question for Team A
+                const firstQuestion = questionsData.questions[0];
+                log(`Question 1: ${firstQuestion.question}`, 'info');
+                log(`Correct answer: ${firstQuestion.correct_answer}`, 'info');
+                
+                // Submit answer for Team A (first player)
+                const teamAPeer = testPeers[0]; // First peer is Team A
+                await apiCall('?action=submit_answer', 'POST', {
+                    gameId: gameId,
+                    peerId: teamAPeer.peerId,
+                    roomId: testRoomId,
+                    selectedAnswer: firstQuestion.correct_answer,
+                    questionIndex: 0,
+                    correctAnswer: firstQuestion.correct_answer
+                });
+                
+                log(`${teamAPeer.username} submitted correct answer`, 'success');
+                
+                // Move to next question
+                await apiCall('?action=next_question', 'POST', {
+                    gameId: gameId,
+                    roomId: testRoomId
+                });
+                
+                log('Moved to next question', 'success');
+                
+            } catch (error) {
+                log(`Failed to test question flow: ${error.message}`, 'error');
+            }
+        }
+
+        async function finishCompetition() {
+            if (!gameId) {
+                log('Need active competition', 'error');
+                return;
+            }
+
+            try {
+                log('Finishing competition (simulating all questions)...');
+                
+                // Simulate finishing the game by calling next_question multiple times
+                for (let i = 0; i < 15; i++) { // Go beyond 14 questions to finish
+                    try {
+                        await apiCall('?action=next_question', 'POST', {
+                            gameId: gameId,
+                            roomId: testRoomId
+                        });
+                    } catch (error) {
+                        // Expected when game finishes
+                        break;
+                    }
+                }
+                
+                // Get final results
+                const resultsData = await apiCall(`?action=get_results&gameId=${gameId}`);
+                log('Competition finished! Final results:', 'success');
+                log(`Team A Score: ${resultsData.results.game.team_a_score}`, 'info');
+                log(`Team B Score: ${resultsData.results.game.team_b_score}`, 'info');
+                
+            } catch (error) {
+                log(`Failed to finish competition: ${error.message}`, 'error');
+            }
+        }
+
+        async function leaveAllUsers() {
+            if (testPeers.length === 0) {
+                log('No users to remove', 'error');
+                return;
+            }
+
+            try {
+                log('Removing all test users...');
+                
+                for (const peer of testPeers) {
+                    await apiCall('?action=leave', 'POST', {
+                        roomId: testRoomId,
+                        peerId: peer.peerId,
+                        reason: 'test_cleanup'
+                    });
+                    
+                    log(`${peer.username} left the room`, 'success');
+                }
+                
+                testPeers = [];
+                log('All users removed', 'success');
+                
+            } catch (error) {
+                log(`Failed to remove users: ${error.message}`, 'error');
+            }
+        }
+
+        function resetTest() {
+            testRoomId = null;
+            gameId = null;
+            testPeers = [];
+            document.getElementById('results').textContent = 'Test reset. Ready to start again...\n';
+            log('Test environment reset', 'success');
+        }
+
+        // Initial status
+        log('Competition test tool ready');
+        log('Please follow the steps in order: Room Setup → Competition Flow → Cleanup');
+    </script>
+</body>
+</html>

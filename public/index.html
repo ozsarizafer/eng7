@@ -439,6 +439,461 @@
                 align-items: stretch;
             }
         }
+        
+        /* Competition Portal Styles */
+        .competition-portal {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+            border: 3px solid #28a745;
+            display: none;
+        }
+        
+        .competition-portal.active {
+            display: block;
+        }
+        
+        .competition-portal h3 {
+            margin: 0 0 1.5rem 0;
+            color: #333;
+            font-size: 1.4rem;
+            font-weight: bold;
+            text-align: center;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .competition-controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .competition-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .competition-btn:hover:not(:disabled) {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        
+        .competition-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .ready-btn {
+            background: #17a2b8;
+        }
+        
+        .ready-btn:hover:not(:disabled) {
+            background: #138496;
+        }
+        
+        .ready-btn.ready {
+            background: #28a745;
+        }
+        
+        .team-selection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 2rem 0;
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 2px solid #dee2e6;
+        }
+        
+        .team-selection h4 {
+            margin: 0 0 1rem 0;
+            color: #333;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        
+        .team-buttons {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .team-btn {
+            background: white;
+            border: 3px solid #dee2e6;
+            padding: 1.5rem;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            min-width: 140px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .team-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .team-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .team-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .team-desc {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .team-a-btn {
+            border-color: #007bff;
+        }
+        
+        .team-a-btn .team-name {
+            color: #007bff;
+        }
+        
+        .team-a-btn:hover {
+            background: #e3f2fd;
+            border-color: #0056b3;
+        }
+        
+        .team-a-btn.selected {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+            box-shadow: 0 0 20px rgba(0, 123, 255, 0.4);
+        }
+        
+        .team-a-btn.selected .team-name,
+        .team-a-btn.selected .team-desc {
+            color: white;
+        }
+        
+        .team-b-btn {
+            border-color: #dc3545;
+        }
+        
+        .team-b-btn .team-name {
+            color: #dc3545;
+        }
+        
+        .team-b-btn:hover {
+            background: #ffeaa7;
+            border-color: #c82333;
+        }
+        
+        .team-b-btn.selected {
+            background: #dc3545;
+            color: white;
+            border-color: #c82333;
+            box-shadow: 0 0 20px rgba(220, 53, 69, 0.4);
+        }
+        
+        .team-b-btn.selected .team-name,
+        .team-b-btn.selected .team-desc {
+            color: white;
+        }
+        
+        .teams-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .team-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 2px solid #dee2e6;
+        }
+        
+        .team-section.team-a {
+            border-color: #007bff;
+            background: linear-gradient(135deg, #007bff15, #0056b315);
+        }
+        
+        .team-section.team-b {
+            border-color: #dc3545;
+            background: linear-gradient(135deg, #dc354515, #c8254215);
+        }
+        
+        .team-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .team-a .team-header {
+            color: #007bff;
+        }
+        
+        .team-b .team-header {
+            color: #dc3545;
+        }
+        
+        .team-members {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .team-member {
+            background: white;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #dee2e6;
+        }
+        
+        .member-status {
+            font-size: 0.8rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            color: white;
+        }
+        
+        .member-status.ready {
+            background: #28a745;
+        }
+        
+        .member-status.waiting {
+            background: #6c757d;
+        }
+        
+        .game-status {
+            text-align: center;
+            padding: 1rem;
+            background: #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-weight: bold;
+        }
+        
+        .question-display {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 2px solid #007bff;
+            display: none;
+        }
+        
+        .question-display.active {
+            display: block;
+        }
+        
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .question-number {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .timer-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        
+        .current-team {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        
+        .current-team.team-a {
+            color: #007bff;
+        }
+        
+        .current-team.team-b {
+            color: #dc3545;
+        }
+        
+        .question-content {
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .option-button {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.3s ease;
+        }
+        
+        .option-button:hover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        .option-button.selected {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+        
+        .option-button.correct {
+            background: #28a745;
+            color: white;
+            border-color: #1e7e34;
+        }
+        
+        .option-button.incorrect {
+            background: #dc3545;
+            color: white;
+            border-color: #c82333;
+        }
+        
+        .submit-answer {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .submit-answer:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .scoreboard {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 2px solid #28a745;
+            text-align: center;
+        }
+        
+        .score-display {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 1rem;
+        }
+        
+        .team-score {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .team-score.team-a {
+            color: #007bff;
+        }
+        
+        .team-score.team-b {
+            color: #dc3545;
+        }
+        
+        .next-question-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .results-display {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            border: 2px solid #ffc107;
+            text-align: center;
+            display: none;
+        }
+        
+        .results-display.active {
+            display: block;
+        }
+        
+        .winner-announcement {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #28a745;
+        }
+        
+        @media (max-width: 768px) {
+            .teams-display {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .competition-controls {
+                flex-direction: column;
+            }
+            
+            .team-buttons {
+                flex-direction: column;
+                gap: 1rem;
+                width: 100%;
+            }
+            
+            .team-btn {
+                width: 100%;
+                min-width: auto;
+            }
+        }
     </style>
 </head>
 <body>
@@ -458,6 +913,115 @@
             <div id="availableRoomsList" class="rooms-grid">
                 Loading available rooms...
             </div>
+        </div>
+
+        <!-- Competition Portal -->
+        <div class="competition-portal" id="competitionPortal">
+            <h3>🏆 Competition Portal</h3>
+            
+            <div class="competition-controls">
+                <div class="team-selection">
+                    <h4>🏆 Choose Your Team</h4>
+                    <div class="team-buttons">
+                        <button id="selectTeamABtn" class="team-btn team-a-btn">
+                            <div class="team-icon">🔵</div>
+                            <div class="team-name">Team A</div>
+                            <div class="team-desc">Blue Team</div>
+                        </button>
+                        <button id="selectTeamBBtn" class="team-btn team-b-btn">
+                            <div class="team-icon">🔴</div>
+                            <div class="team-name">Team B</div>
+                            <div class="team-desc">Red Team</div>
+                        </button>
+                    </div>
+                </div>
+                <button id="readyBtn" class="ready-btn" disabled>Select Team First</button>
+            </div>
+            
+            <div class="game-status" id="gameStatus">
+                Select a team and click "I'm Ready" to join competition
+            </div>
+            
+            <div class="teams-display" id="teamsDisplay" style="display: none;">
+                <div class="team-section team-a">
+                    <div class="team-header">Team A</div>
+                    <ul class="team-members" id="teamAMembers">
+                    </ul>
+                </div>
+                <div class="team-section team-b">
+                    <div class="team-header">Team B</div>
+                    <ul class="team-members" id="teamBMembers">
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="scoreboard" id="scoreboard" style="display: none;">
+                <div class="score-display">
+                    <div>
+                        <div>Team A</div>
+                        <div class="team-score team-a" id="teamAScore">0</div>
+                    </div>
+                    <div>
+                        <div>Team B</div>
+                        <div class="team-score team-b" id="teamBScore">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Question Display -->
+        <div class="question-display" id="questionDisplay">
+            <div class="question-header">
+                <div class="question-number" id="questionNumber">Question 1/14</div>
+                <div class="current-team" id="currentTeamDisplay">Team A's Turn</div>
+                <div class="timer-display" id="timerDisplay">1:00</div>
+            </div>
+            
+            <div class="question-content" id="questionContent">
+                Question will appear here...
+            </div>
+            
+            <div class="options-grid" id="optionsGrid">
+                <!-- Options will be generated by JavaScript -->
+            </div>
+            
+            <button class="submit-answer" id="submitAnswerBtn" disabled>Submit Answer</button>
+            
+            <div class="scoreboard" id="currentScoreboard" style="display: none; margin-top: 2rem;">
+                <div class="score-display">
+                    <div>
+                        <div>Team A</div>
+                        <div class="team-score team-a" id="currentTeamAScore">0</div>
+                    </div>
+                    <div>
+                        <div>Team B</div>
+                        <div class="team-score team-b" id="currentTeamBScore">0</div>
+                    </div>
+                </div>
+                <button class="next-question-btn" id="nextQuestionBtn" style="display: none;">Next Question</button>
+            </div>
+        </div>
+        
+        <!-- Results Display -->
+        <div class="results-display" id="resultsDisplay">
+            <div class="winner-announcement" id="winnerAnnouncement">
+                Competition Results
+            </div>
+            
+            <div class="scoreboard">
+                <div class="score-display">
+                    <div>
+                        <div>Team A</div>
+                        <div class="team-score team-a" id="finalTeamAScore">0</div>
+                    </div>
+                    <div>
+                        <div>Team B</div>
+                        <div class="team-score team-b" id="finalTeamBScore">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="competition-btn" id="newCompetitionBtn" style="margin-top: 2rem;">Start New Competition</button>
         </div>
 
         <div class="controls">
