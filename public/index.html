@@ -180,41 +180,6 @@
             display: none;
         }
 
-        .network-info {
-            background: rgba(255, 255, 255, 0.95);
-            border: 2px solid #4CAF50;
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin: 1rem 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
-        }
-
-        .network-info h4 {
-            color: #4CAF50;
-            margin: 0 0 1rem 0;
-            font-size: 1.1rem;
-        }
-
-        .network-info p {
-            margin: 0.5rem 0;
-            color: #333;
-        }
-
-        .network-info code {
-            background: #f1f3f4;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-family: monospace;
-            color: #1976d2;
-            word-break: break-all;
-        }
-
-        .network-info small {
-            color: #666;
-            font-style: italic;
-        }
-
         .status {
             background: rgba(255, 255, 255, 0.9);
             padding: 1rem;
@@ -308,17 +273,44 @@
         }
 
         .available-rooms {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 2rem;
             border-radius: 15px;
             margin-bottom: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+            border: 3px solid #667eea;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .available-rooms::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+            background-size: 200% 100%;
+            animation: gradientShift 3s ease-in-out infinite;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
         }
 
         .available-rooms h3 {
-            margin: 0 0 1rem 0;
+            margin: 0 0 1.5rem 0;
             color: #333;
-            font-size: 1.2rem;
+            font-size: 1.4rem;
+            font-weight: bold;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .room-controls {
@@ -356,18 +348,19 @@
         .room-card {
             background: linear-gradient(135deg, #f8f9fa, #e9ecef);
             border: 2px solid #dee2e6;
-            border-radius: 10px;
-            padding: 1rem;
+            border-radius: 12px;
+            padding: 1.2rem;
             cursor: pointer;
             transition: all 0.3s ease;
             position: relative;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
         .room-card:hover {
             border-color: #667eea;
-            background: linear-gradient(135deg, #667eea20, #764ba220);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            background: linear-gradient(135deg, #667eea15, #764ba215);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
         }
 
         .room-card.full {
@@ -455,6 +448,18 @@
     </div>
 
     <div class="container">
+        <!-- Available Rooms Section - Primary entry point (moved to top) -->
+        <div class="available-rooms">
+            <h3>🏠 Join a Room - Click to Enter</h3>
+            <div class="room-controls">
+                <button id="refreshRoomsBtn" class="refresh-btn">🔄 Refresh</button>
+                <span class="room-count">Loading rooms...</span>
+            </div>
+            <div id="availableRoomsList" class="rooms-grid">
+                Loading available rooms...
+            </div>
+        </div>
+
         <div class="controls">
             <div class="input-group">
                 <input type="text" id="usernameInput" placeholder="Your username" />
@@ -484,18 +489,6 @@
                         <audio id="localAudio" muted></audio>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Available Rooms Section - Only way to join rooms -->
-        <div class="available-rooms">
-            <h3>🏠 Join a Room - Click to Enter</h3>
-            <div class="room-controls">
-                <button id="refreshRoomsBtn" class="refresh-btn">🔄 Refresh</button>
-                <span class="room-count">Loading rooms...</span>
-            </div>
-            <div id="availableRoomsList" class="rooms-grid">
-                Loading available rooms...
             </div>
         </div>
 

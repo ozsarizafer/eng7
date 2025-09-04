@@ -87,9 +87,12 @@ class SignalController {
         }
 
         try {
-            // Clean up inactive peers before checking capacity (more aggressive - 2 minutes)
+            // Clean up inactive peers before checking capacity (more aggressive - 1 minute)
             try {
-                $this->signal->cleanupInactivePeers(2);
+                $cleanupCount = $this->signal->cleanupInactivePeers(1);
+                if ($cleanupCount > 0) {
+                    error_log("Cleaned up $cleanupCount inactive peers before join");
+                }
             } catch (Exception $cleanupError) {
                 error_log("Cleanup failed, continuing with join: " . $cleanupError->getMessage());
                 // Don't let cleanup failure prevent joining
@@ -102,19 +105,18 @@ class SignalController {
                 error_log("Message cleanup failed, continuing with join: " . $cleanupError->getMessage());
                 // Don't let cleanup failure prevent joining
             }
-            // Remove any existing entry for this peer (rejoin scenario)
-            $this->signal->leavePeer($peerId);
-
-            // Check room capacity (max 4 peers) after cleanup
-            $currentPeers = $this->signal->getRoomPeers($roomId);
             
-            if (count($currentPeers) >= 4) {
+            // Atomic join with capacity validation
+            $this->signal->joinRoom($roomId, $peerId, $username);
+            
+        } catch (Exception $e) {
+            // Handle capacity exceeded error specifically
+            if (strpos($e->getMessage(), 'capacity exceeded') !== false) {
+                error_log("Room capacity exceeded for peer $peerId in room $roomId");
                 $this->sendError('Room is full. Maximum 4 participants allowed.', 403);
                 return;
             }
-
-            $this->signal->joinRoom($roomId, $peerId, $username);
-        } catch (Exception $e) {
+            
             error_log("Error in handleJoin: " . $e->getMessage());
             throw $e; // Re-throw to be caught by main exception handler
         }
@@ -127,11 +129,16 @@ class SignalController {
             'peerId' => $peerId,
             'username' => $username
         ]);
+        
+        // Immediate capacity update broadcast
+        $this->broadcastCapacityUpdate($roomId);
 
         $this->sendSuccess([
             'message' => 'Successfully joined room',
             'roomId' => $roomId,
             'peerId' => $peerId,
+            'currentCapacity' => count($allPeers),
+            'maxCapacity' => 4,
             'existingPeers' => array_filter($allPeers, function($peer) use ($peerId) {
                 return $peer['peer_id'] !== $peerId;
             })
@@ -159,6 +166,9 @@ class SignalController {
         ]);
 
         $this->signal->leavePeer($peerId);
+        
+        // Immediate capacity update after leave
+        $this->broadcastCapacityUpdate($roomId);
         
         // Trigger immediate cleanup for performance
         try {
@@ -256,16 +266,16 @@ class SignalController {
             // Update last seen
             $this->signal->updatePeerLastSeen($peerId);
             
-            // More frequent cleanup - every 3 seconds (increased frequency)
+            // More conservative cleanup - every 10 seconds (reduced frequency)
             $cleanupCounter++;
-            if ($cleanupCounter >= 3) {
-                $this->signal->bulkCleanupInactivePeers(0.5); // Very aggressive - Clean peers inactive for 30+ seconds
+            if ($cleanupCounter >= 10) {
+                $this->signal->bulkCleanupInactivePeers(2); // Less aggressive - Clean peers inactive for 2+ minutes
                 $cleanupCounter = 0;
             }
             
-            // Update room list more frequently - every 3 seconds
+            // Update room list less frequently - every 15 seconds
             $roomListUpdateCounter++;
-            if ($roomListUpdateCounter >= 3) {
+            if ($roomListUpdateCounter >= 15) {
                 // Send room list update to all connected peers
                 $this->broadcastRoomListUpdate();
                 $roomListUpdateCounter = 0;
@@ -275,19 +285,32 @@ class SignalController {
             $messages = $this->signal->getUnprocessedMessages($peerId);
 
             if (!empty($messages)) {
+                // Batch messages for better performance
+                $batchedEvents = [];
+                
                 foreach ($messages as $message) {
-                    $eventData = json_encode([
+                    $batchedEvents[] = [
+                        'id' => $message['id'],
                         'type' => $message['message_type'],
                         'from' => $message['from_peer_id'],
                         'data' => json_decode($message['message_data'], true),
                         'timestamp' => $message['created_at']
-                    ]);
-
-                    echo "id: " . $message['id'] . "\n";
-                    echo "data: " . $eventData . "\n\n";
+                    ];
                     
                     $this->signal->markMessageAsProcessed($message['id']);
                 }
+                
+                // Send batched events
+                if (count($batchedEvents) === 1) {
+                    // Single message
+                    echo "id: " . $batchedEvents[0]['id'] . "\n";
+                    echo "data: " . json_encode($batchedEvents[0]) . "\n\n";
+                } else {
+                    // Multiple messages - send as batch
+                    echo "id: batch_" . time() . "\n";
+                    echo "data: " . json_encode(['type' => 'batch', 'messages' => $batchedEvents]) . "\n\n";
+                }
+                
                 flush();
             }
 
@@ -296,7 +319,7 @@ class SignalController {
                 break;
             }
 
-            sleep(1); // Check every second
+            sleep(3); // Check every 3 seconds for better performance
         }
     }
 
@@ -482,6 +505,41 @@ class SignalController {
         http_response_code($code);
         echo json_encode(['success' => false, 'error' => $message]);
         exit();
+    }
+    
+    private function broadcastCapacityUpdate($roomId) {
+        try {
+            $currentPeers = $this->signal->getRoomPeers($roomId);
+            $capacity = count($currentPeers);
+            
+            // Get all active peers to broadcast to
+            $sql = "SELECT DISTINCT peer_id FROM peers WHERE is_connected = 1";
+            $db = Database::getInstance();
+            $stmt = $db->query($sql);
+            $activePeers = $stmt->fetchAll();
+            
+            // Broadcast capacity update to all connected clients
+            foreach ($activePeers as $peer) {
+                $this->signal->addSignalingMessage(
+                    'system', 
+                    $peer['peer_id'], 
+                    'system', 
+                    'capacity-update', 
+                    [
+                        'roomId' => $roomId,
+                        'currentCapacity' => $capacity,
+                        'maxCapacity' => 4,
+                        'isFull' => $capacity >= 4,
+                        'timestamp' => time()
+                    ]
+                );
+            }
+            
+            error_log("Broadcasted capacity update for room $roomId: $capacity/4 participants");
+            
+        } catch (Exception $e) {
+            error_log("Failed to broadcast capacity update: " . $e->getMessage());
+        }
     }
     
     private function broadcastRoomListUpdate() {

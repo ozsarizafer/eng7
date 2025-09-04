@@ -11,6 +11,8 @@ class AudioConferenceClient {
         this.isMuted = false;
         this.existingPeers = [];
         this.connectionVersion = 0; // Track connection version for ICE candidate validation
+        this.roomCapacities = new Map(); // Track room capacities for optimal joining
+        this.joinInProgress = false; // Prevent concurrent join attempts
         
         // Get the current host and port for API calls
         this.apiBase = this.getApiBase();
@@ -31,7 +33,8 @@ class AudioConferenceClient {
         this.initializeElements();
         this.bindEvents();
         this.updateUI();
-        this.displayConnectionInfo();
+        // Network info display disabled
+        // this.displayConnectionInfo();
     }
 
     initializeElements() {
@@ -356,8 +359,8 @@ class AudioConferenceClient {
                         console.log(`📲 Suggested URL for other devices: ${suggestedUrl}`);
                         console.log(`🏠 Using local STUN server: ${localStunUrl}`);
                         
-                        // Display this info in the UI
-                        this.showNetworkInfo(localIp, suggestedUrl);
+                        // Network info display disabled
+                        // this.showNetworkInfo(localIp, suggestedUrl);
                         
                         pc.close();
                         return;
@@ -417,16 +420,32 @@ class AudioConferenceClient {
     }
 
     async joinRoom(targetRoomId = null) {
+        // Prevent concurrent join attempts
+        if (this.joinInProgress) {
+            console.log('⚠️ Join already in progress, ignoring request');
+            return;
+        }
+        
         this.username = this.usernameInput.value.trim() || 'Anonymous';
         
         // Use target room ID if provided (from room card click), otherwise use stored roomId
         if (targetRoomId) {
             this.roomId = targetRoomId;
+            this.pendingRoomId = targetRoomId;
         } else if (!this.roomId) {
             this.showMessage('No room selected. Please click on a room in the Available Rooms section.', 'error');
             return;
         }
-
+        
+        // Check room capacity before attempting join
+        const roomCapacity = this.roomCapacities.get(this.roomId) || 0;
+        if (roomCapacity >= 4) {
+            this.showMessage(`Room ${this.roomId} is full (${roomCapacity}/4 participants)`, 'error');
+            return;
+        }
+        
+        this.joinInProgress = true;
+        
         try {
             // Ensure clean state before joining
             if (this.isConnected) {
@@ -450,6 +469,14 @@ class AudioConferenceClient {
             if (result.success) {
                 this.isConnected = true;
                 this.existingPeers = result.data.existingPeers || [];
+                this.joinInProgress = false; // Clear join progress flag
+                this.pendingRoomId = null;
+                
+                // Update room capacity tracking
+                if (result.data.currentCapacity !== undefined) {
+                    this.roomCapacities.set(this.roomId, result.data.currentCapacity);
+                }
+                
                 this.updateStatus('connected', 'Connected to room: ' + this.roomId);
                 this.currentRoom.textContent = this.roomId;
                 this.updateLocalParticipant();
@@ -482,6 +509,9 @@ class AudioConferenceClient {
                 // Refresh room list to update participant counts
                 setTimeout(() => this.loadAvailableRooms(), 1000);
             } else {
+                this.joinInProgress = false; // Clear join progress flag on error
+                this.pendingRoomId = null;
+                
                 // Enhanced error handling for different error types
                 if (result.error && result.error.includes('constraint')) {
                     console.log('🔧 Foreign key constraint detected, attempting repair...');
@@ -507,6 +537,8 @@ class AudioConferenceClient {
                 }
             }
         } catch (error) {
+            this.joinInProgress = false; // Clear join progress flag on exception
+            this.pendingRoomId = null;
             console.error('Join room error:', error);
             this.showMessage('Connection error: ' + error.message, 'error');
         }
@@ -871,7 +903,18 @@ class AudioConferenceClient {
         this.eventSource.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data);
-                this.handleSignalingMessage(message);
+                
+                // Handle batched messages
+                if (message.type === 'batch' && message.messages) {
+                    console.log(`📦 Received batched messages: ${message.messages.length}`);
+                    // Process each message in the batch
+                    for (const batchedMessage of message.messages) {
+                        this.handleSignalingMessage(batchedMessage);
+                    }
+                } else {
+                    // Handle single message
+                    this.handleSignalingMessage(message);
+                }
             } catch (error) {
                 console.error('Failed to parse signaling message:', error);
             }
@@ -879,12 +922,22 @@ class AudioConferenceClient {
 
         this.eventSource.onerror = (error) => {
             console.error('SSE error:', error);
-            // Attempt to reconnect after 3 seconds
-            setTimeout(() => {
-                if (this.isConnected && (!this.eventSource || this.eventSource.readyState === EventSource.CLOSED)) {
-                    this.startSignaling();
-                }
-            }, 3000);
+            
+            // More intelligent reconnection strategy
+            if (this.eventSource.readyState === EventSource.CLOSED) {
+                console.log('🔄 SSE connection closed, attempting reconnection...');
+                
+                // Exponential backoff for reconnection
+                const reconnectDelay = Math.min(3000 * Math.pow(1.5, this.reconnectAttempts || 0), 30000);
+                this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+                
+                setTimeout(() => {
+                    if (this.isConnected) {
+                        console.log(`🔄 Reconnection attempt ${this.reconnectAttempts} after ${reconnectDelay}ms`);
+                        this.startSignaling();
+                    }
+                }, reconnectDelay);
+            }
         };
     }
 
@@ -909,6 +962,9 @@ class AudioConferenceClient {
                 break;
             case 'room-list-update':
                 this.handleRoomListUpdate(message.data);
+                break;
+            case 'capacity-update':
+                this.handleCapacityUpdate(message.data);
                 break;
         }
     }
@@ -984,6 +1040,23 @@ class AudioConferenceClient {
         } else {
             // If data format is different, fall back to API call
             this.loadAvailableRooms();
+        }
+    }
+    
+    handleCapacityUpdate(data) {
+        console.log(`📊 Capacity update for room ${data.roomId}: ${data.currentCapacity}/${data.maxCapacity}`);
+        
+        // Update local capacity tracking
+        this.roomCapacities.set(data.roomId, data.currentCapacity);
+        
+        // Update room card UI immediately
+        this.updateRoomCardCapacity(data.roomId, data.currentCapacity, data.isFull);
+        
+        // If trying to join a room that just became full, show message
+        if (data.isFull && this.joinInProgress && this.pendingRoomId === data.roomId) {
+            this.showMessage(`Room ${data.roomId} became full (${data.currentCapacity}/${data.maxCapacity})`, 'warning');
+            this.joinInProgress = false;
+            this.pendingRoomId = null;
         }
     }
 
@@ -2138,6 +2211,39 @@ class AudioConferenceClient {
         
         this.displayAvailableRooms(rooms);
         this.roomCount.textContent = `${rooms.length} room(s) available`;
+    }
+    
+    updateRoomCardCapacity(roomId, capacity, isFull) {
+        // Find the room card and update its capacity display
+        const roomCards = document.querySelectorAll('.room-card');
+        
+        roomCards.forEach(card => {
+            if (card.dataset.roomId === roomId) {
+                // Update capacity display
+                const participantsElement = card.querySelector('.room-participants');
+                if (participantsElement) {
+                    participantsElement.textContent = `${capacity}/4`;
+                    participantsElement.className = `room-participants ${isFull ? 'full' : ''}`;
+                }
+                
+                // Update card class and visual state
+                card.className = `room-card ${isFull ? 'full' : ''} ${roomId === this.roomId ? 'current' : ''}`;
+                
+                // Update full indicator
+                let fullIndicator = card.querySelector('.full-status');
+                if (isFull && !fullIndicator) {
+                    fullIndicator = document.createElement('div');
+                    fullIndicator.className = 'full-status';
+                    fullIndicator.style.cssText = 'font-size: 0.8rem; color: #dc3545; margin-top: 0.5rem;';
+                    fullIndicator.textContent = 'Room Full';
+                    card.appendChild(fullIndicator);
+                } else if (!isFull && fullIndicator) {
+                    fullIndicator.remove();
+                }
+                
+                console.log(`📊 Updated room card ${roomId}: ${capacity}/4 ${isFull ? '(FULL)' : ''}`);
+            }
+        });
     }
 
     async getRoomParticipantCounts(rooms) {

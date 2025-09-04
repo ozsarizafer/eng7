@@ -55,30 +55,48 @@ class Signal {
     }
 
     public function joinRoom($roomId, $peerId, $username = null) {
+        // Atomic join operation with capacity validation
+        $this->db->query("BEGIN IMMEDIATE TRANSACTION");
+        
         try {
             // First, ensure room exists and get confirmation
             $this->ensureRoomExists($roomId);
             
-            // Verify the room actually exists before proceeding
-            $sql = "SELECT room_id FROM rooms WHERE room_id = ?";
+            // Atomic capacity check with row locking
+            $sql = "SELECT COUNT(*) as count FROM peers 
+                    WHERE room_id = ? AND is_connected = 1
+                    AND last_seen >= datetime('now', '-2 minutes')";
             $stmt = $this->db->query($sql, [$roomId]);
-            $room = $stmt->fetch();
+            $currentCount = $stmt->fetch()['count'];
             
-            if (!$room) {
-                throw new Exception("Room does not exist: $roomId");
+            // Enforce 4-person capacity limit
+            if ($currentCount >= 4) {
+                $this->db->query("ROLLBACK");
+                throw new Exception("Room capacity exceeded: $currentCount/4 participants");
             }
-
+            
             // Remove any existing peer connection with proper foreign key handling
             $this->leavePeer($peerId);
             
             // Small delay to ensure cleanup is complete
-            usleep(100000); // 100ms delay
+            usleep(50000); // 50ms delay
 
             // Add new peer to room using the confirmed room_id
-            $sql = "INSERT INTO peers (peer_id, room_id, username) VALUES (?, ?, ?)";
-            return $this->db->query($sql, [$peerId, $room['room_id'], $username]);
+            $sql = "INSERT INTO peers (peer_id, room_id, username, joined_at, last_seen) 
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+            $result = $this->db->query($sql, [$peerId, $roomId, $username]);
+            
+            // Commit the transaction
+            $this->db->query("COMMIT");
+            
+            // Log successful join for monitoring
+            error_log("ATOMIC JOIN SUCCESS: Peer $peerId joined room $roomId (" . ($currentCount + 1) . "/4)");
+            
+            return $result;
+            
         } catch (Exception $e) {
-            error_log("Error in joinRoom for peer $peerId in room $roomId: " . $e->getMessage());
+            $this->db->query("ROLLBACK");
+            error_log("ATOMIC JOIN FAILED: " . $e->getMessage());
             throw $e;
         }
     }
@@ -109,8 +127,14 @@ class Signal {
     }
 
     public function getRoomPeers($roomId) {
-        $sql = "SELECT peer_id, username, joined_at FROM peers WHERE room_id = ? AND is_connected = 1";
+        $sql = "SELECT peer_id, username, joined_at FROM peers WHERE room_id = ? AND is_connected = 1 AND last_seen >= datetime('now', '-2 minutes')";
         $stmt = $this->db->query($sql, [$roomId]);
+        return $stmt->fetchAll();
+    }
+    
+    public function getAllActivePeers() {
+        $sql = "SELECT peer_id, room_id, username FROM peers WHERE is_connected = 1 AND last_seen >= datetime('now', '-2 minutes')";
+        $stmt = $this->db->query($sql);
         return $stmt->fetchAll();
     }
 
