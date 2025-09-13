@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Find Trues</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+  /* Cennet Kuşu (Bird of Paradise) Renk Paleti */
+  :root {
+    --bop-dark-green: #0a2e2b;
+    --bop-orange: #ff8c00;
+    --bop-orange-light: #ffae42; /* Turuncunun açık tonu */
+    --bop-blue: #006aff;
+    --bop-blue-light: #4d94ff;   /* Mavinin açık tonu */
+    --bop-light-green: #3c8263;
+    --bop-text: #f0f8ff;
+    --bop-red: #d94a4a;
+    --container-bg: #0f4540;
+  }
+
+  body {
+    margin: 0;
+    padding: 20px;
+    /* Zemine dairesel gradyan eklendi */
+    background: radial-gradient(circle, var(--container-bg) 0%, var(--bop-dark-green) 100%);
+    color: var(--bop-text);
+    font-family: 'Poppins', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+  }
+
+  .container {
+    text-align: center;
+    max-width: 900px;
+    width: 100%;
+    padding: 30px;
+    background: rgba(15, 69, 64, 0.5); /* Hafif şeffaf arka plan */
+    backdrop-filter: blur(10px); /* Cam efekti için */
+    border-radius: 20px;
+    border: 1px solid rgba(240, 248, 255, 0.2);
+  }
+
+  h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: var(--bop-orange);
+    text-shadow: 0 0 5px rgba(255, 140, 0, 0.5); /* Okunabilirlik için hafif gölge */
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+  }
+
+  .scoreboard {
+    font-size: 1.5rem;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  .team {
+    display: inline-block;
+    width: 180px;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+    border: 2px solid transparent;
+  }
+
+  /* Takım kutularına gradyan eklendi */
+  .team.A {
+    background: linear-gradient(45deg, var(--bop-orange-light), var(--bop-orange));
+    color: var(--bop-dark-green);
+  }
+  .team.B {
+    background: linear-gradient(45deg, var(--bop-blue-light), var(--bop-blue));
+    color: var(--bop-text);
+  }
+
+  .active {
+    border-color: var(--bop-text);
+    transform: scale(1.05);
+  }
+
+  .question-counter {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    color: var(--bop-text);
+    opacity: 0.8;
+    font-weight: 600;
+  }
+
+  .answer {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 20px 0 30px 0;
+    color: #ffffff;
+  }
+
+  .options {
+    margin: 20px 0;
+    text-align: left;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .options button {
+    width: 100%;
+    background: #1a5c54;
+    border: 2px solid #1a5c54;
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 1.2rem;
+    color: var(--bop-text);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .options button:not(:disabled):hover {
+    background: var(--container-bg);
+    border-color: var(--bop-orange);
+  }
+
+  .options button.correct {
+    background: linear-gradient(45deg, #57a683, var(--bop-light-green));
+    border-color: var(--bop-light-green);
+    color: #fff;
+  }
+
+  .options button.wrong {
+    background: linear-gradient(45deg, #e56b6b, var(--bop-red));
+    border-color: var(--bop-red);
+    color: #fff;
+  }
+  
+  .options button:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+  }
+
+  #nextBtn {
+    padding: 15px 50px;
+    font-size: 1.3rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 50px;
+    /* Next butonuna gradyan eklendi */
+    background: linear-gradient(45deg, var(--bop-orange-light), var(--bop-orange));
+    color: var(--bop-dark-green);
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  #nextBtn:not(:disabled):hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  #nextBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1></h1>
+  <div class="scoreboard">
+    <span id="teamA" class="team A active">Team A: 0</span>
+    <span id="teamB" class="team B">Team B: 0</span>
+  </div>
+  <div class="question-counter" id="questionCounter">Question: 1 / 32</div>
+  <div class="answer" id="answer"></div>
+  <div class="options" id="options"></div>
+  <button id="nextBtn" onclick="nextQuestion()" disabled>Next</button>
+</div>
+
+<script>
+// 32 soruyu buraya ekleyin
+const questions = [
+  {
+    "answer": "The Pacific Ocean",
+    "options": [
+      {"text": "What is the largest ocean in the world?", "correct": true},
+      {"text": "Which ocean borders the west coast of the Americas?", "correct": true},
+      {"text": "Which ocean covers one-third of the Earth’s surface?", "correct": true},
+      {"text": "Which ocean is the smallest in the world?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Mount Everest",
+    "options": [
+      {"text": "What is the tallest mountain in the world?", "correct": true},
+      {"text": "Which mountain is located in the Himalayas?", "correct": true},
+      {"text": "Which mountain lies on the border of Nepal and China?", "correct": true},
+      {"text": "Which mountain is the tallest in Africa?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Sahara Desert",
+    "options": [
+      {"text": "What is the largest hot desert in the world?", "correct": true},
+      {"text": "Which desert is located in North Africa?", "correct": true},
+      {"text": "Which desert covers countries like Algeria and Libya?", "correct": true},
+      {"text": "Which desert is located in Antarctica?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Nile River",
+    "options": [
+      {"text": "What is the longest river in the world?", "correct": true},
+      {"text": "Which river flows through Egypt and Sudan?", "correct": true},
+      {"text": "Which African river empties into the Mediterranean Sea?", "correct": true},
+      {"text": "Which river runs through Paris?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Blue Whale",
+    "options": [
+      {"text": "What is the largest animal on Earth?", "correct": true},
+      {"text": "Which animal can reach over 30 meters in length?", "correct": true},
+      {"text": "Which sea creature is the heaviest living being?", "correct": true},
+      {"text": "Which animal is the largest land mammal?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Camel",
+    "options": [
+      {"text": "Which animal is called the 'ship of the desert'?", "correct": true},
+      {"text": "Which animal can store fat in its hump?", "correct": true},
+      {"text": "Which animal can survive for days without water?", "correct": true},
+      {"text": "Which animal produces silk?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Heart",
+    "options": [
+      {"text": "Which organ pumps blood throughout the body?", "correct": true},
+      {"text": "Which organ has four chambers?", "correct": true},
+      {"text": "Which organ beats around 70 times per minute?", "correct": true},
+      {"text": "Which organ controls thoughts and memory?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Brain",
+    "options": [
+      {"text": "Which organ controls the nervous system?", "correct": true},
+      {"text": "Which organ is responsible for memory and learning?", "correct": true},
+      {"text": "Which organ sends signals to the rest of the body?", "correct": true},
+      {"text": "Which organ pumps blood?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Mecca",
+    "options": [
+      {"text": "Where was the Qur’an first revealed?", "correct": true},
+      {"text": "In which city was Prophet Muhammad born?", "correct": true},
+      {"text": "Which city is Islam’s holiest site located in?", "correct": true},
+      {"text": "Which city is the capital of Turkey?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Ramadan",
+    "options": [
+      {"text": "In which month was the Qur’an revealed?", "correct": true},
+      {"text": "Which month is considered the month of fasting and Qur’an?", "correct": true},
+      {"text": "Which month includes Laylat al-Qadr (Night of Power)?", "correct": true},
+      {"text": "In which month do Muslims celebrate Eid al-Adha?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Elephant",
+    "options": [
+      {"text": "Which animal is the largest land mammal?", "correct": true},
+      {"text": "Which animal has a long trunk and tusks?", "correct": true},
+      {"text": "Which animal is known for its memory?", "correct": true},
+      {"text": "Which animal is the fastest runner?", "correct": false}
+    ]
+  },
+  {
+    "answer": "The Sun",
+    "options": [
+      {"text": "What is the star at the center of our solar system?", "correct": true},
+      {"text": "What provides light and heat to the Earth?", "correct": true},
+      {"text": "What is about 150 million km away from Earth?", "correct": true},
+      {"text": "What is the second planet from the Sun?", "correct": false}
+    ]
+  },
+  {
+    "answer": "The Moon",
+    "options": [
+      {"text": "What is Earth’s only natural satellite?", "correct": true},
+      {"text": "Which celestial body affects tides on Earth?", "correct": true},
+      {"text": "Which body was first visited by humans in 1969?", "correct": true},
+      {"text": "Which planet has rings around it?", "correct": false}
+    ]
+  },
+  {
+    "answer": "Milky Way",
+    "options": [
+      {"text": "What is the galaxy that contains our solar system?", "correct": true},
+      {"text": "Which galaxy appears as a band of light in the night sky?", "correct": true},
+      {"text": "Which galaxy is spiral-shaped and vast?", "correct": true},
+      {"text": "Which galaxy is nearest to Andromeda?", "correct": false}
+    ]
+  }
+]
+
+;
+
+let usedQuestions = [];
+let currentQuestionIndex;
+let turn = "A";
+let score = {A:0, B:0};
+let questionNumber = 1;
+
+function shuffleOptions(options) {
+  return options.sort(() => Math.random() - 0.5);
+}
+
+function getRandomQuestionIndex() {
+  if(usedQuestions.length >= questions.length) return -1;
+  let idx;
+  do { idx = Math.floor(Math.random() * questions.length); } while(usedQuestions.includes(idx));
+  usedQuestions.push(idx);
+  return idx;
+}
+
+function showQuestion() {
+  currentQuestionIndex = getRandomQuestionIndex();
+  if(currentQuestionIndex === -1){
+    document.getElementById("answer").textContent = "🏆 The Quiz is Over!";
+    document.getElementById("options").innerHTML = "";
+    document.getElementById("questionCounter").textContent = "";
+    document.getElementById("teamA").classList.remove("active");
+    document.getElementById("teamB").classList.remove("active");
+    document.getElementById("nextBtn").disabled = true;
+    return;
+  }
+
+  const q = questions[currentQuestionIndex];
+  document.getElementById("answer").textContent = q.answer;
+  document.getElementById("questionCounter").textContent = `Question: ${questionNumber} / ${questions.length}`;
+  questionNumber++;
+
+  const optionsDiv = document.getElementById("options");
+  optionsDiv.innerHTML = "";
+  const shuffled = shuffleOptions([...q.options]);
+
+  shuffled.forEach((opt, idx) => {
+    const btn = document.createElement("button");
+    btn.textContent = String.fromCharCode(65 + idx) + ". " + opt.text;
+	
+btn.onclick = () => {
+  if(btn.disabled) return;
+
+  if(opt.correct === false){
+    btn.classList.add("wrong");
+
+    // Tüm doğruları yeşil yap
+    shuffled.forEach(b => {
+      if(b.correct){
+        const correctBtn = Array.from(optionsDiv.children).find(c => c.textContent.includes(b.text));
+        correctBtn.classList.add("correct");
+      }
+    });
+
+    // Tüm butonları devre dışı bırak
+    optionsDiv.querySelectorAll("button").forEach(b => b.disabled = true);
+
+    // Yanlış tıklanınca Next aktif
+    document.getElementById("nextBtn").disabled = false;
+
+  } else {
+    // Doğru ise sadece bu butonu yeşil yap
+    btn.classList.add("correct");
+    score[turn]++;
+    updateScoreboard();
+
+    // Bu butonu devre dışı bırak, diğer doğru seçenekler tıklanabilir kalsın
+    btn.disabled = true;
+
+    // Next butonu hala devre dışı
+    document.getElementById("nextBtn").disabled = true;
+  }
+};
+
+
+    optionsDiv.appendChild(btn);
+  });
+
+  // Next butonunu başta devre dışı bırak
+  document.getElementById("nextBtn").disabled = true;
+
+  // Aktif takım renklerini ayarla
+  document.getElementById("teamA").classList.toggle("active", turn==="A");
+  document.getElementById("teamB").classList.toggle("active", turn==="B");
+}
+
+function updateScoreboard() {
+  document.getElementById("teamA").textContent = `Team A: ${score.A}`;
+  document.getElementById("teamB").textContent = `Team B: ${score.B}`;
+}
+
+function nextQuestion() {
+  turn = turn === "A" ? "B" : "A";
+  showQuestion();
+}
+
+// İlk soru rastgele seçilerek başlar
+showQuestion();
+</script>
+</body>
+</html>

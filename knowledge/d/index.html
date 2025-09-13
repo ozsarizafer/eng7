@@ -1,0 +1,482 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilgi Yarışması</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .team-section {
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .team-a {
+            background-color: #e3f2fd;
+            border: 2px solid #0d6efd;
+        }
+        .team-b {
+            background-color: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+        .player-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .question-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .timer {
+            font-size: 2rem;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .option-btn {
+            margin: 5px;
+            white-space: normal;
+        }
+        .score-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-align: center;
+        }
+        .role-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+        }
+        #resetBtn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">Bilgi Yarışması</h1>
+        
+        <div id="teamSelection" class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Takım Seçimi</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="playerName" class="form-label">Kullanıcı Adı</label>
+                            <input type="text" class="form-control" id="playerName" placeholder="Adınızı girin">
+                        </div>
+                        <div class="mb-3">
+                            <label for="teamSelect" class="form-label">Takım Seçin</label>
+                            <select class="form-select" id="teamSelect">
+                                <option value="">Takım seçin</option>
+                                <option value="A">A Takımı</option>
+                                <option value="B">B Takımı</option>
+                            </select>
+                        </div>
+                        <button id="joinBtn" class="btn btn-success w-100">Yarışmaya Katıl</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="gameContainer" class="d-none">
+            <div class="row">
+                <div class="col-md-5">
+                    <div class="team-section team-a">
+                        <h3>A Takımı <span id="teamACount" class="badge bg-primary">0/2</span></h3>
+                        <div id="teamAPlayers"></div>
+                        <div class="score-display text-primary">Puan: <span id="teamAScore">0</span></div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="timer bg-light rounded py-2">
+                        <div id="timerDisplay">30</div>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="team-section team-b">
+                        <h3>B Takımı <span id="teamBCount" class="badge bg-danger">0/2</span></h3>
+                        <div id="teamBPlayers"></div>
+                        <div class="score-display text-danger">Puan: <span id="teamBScore">0</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="question-container mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 id="currentTeam" class="mb-0">Sıra: Beklemede</h4>
+                    <span id="questionInfo" class="badge bg-secondary">Soru: 0/14</span>
+                </div>
+                
+                <div id="questionView" class="d-none">
+                    <div class="card mb-3">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="card-title mb-0">Soru</h5>
+                        </div>
+                        <div class="card-body">
+                            <p id="questionText" class="card-text"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="card-title mb-0">Seçenekler</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="optionsContainer" class="d-grid gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="waitingView" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Yükleniyor...</span>
+                    </div>
+                    <p class="mt-3">Takımların dolması bekleniyor...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button id="resetBtn" class="btn btn-danger btn-lg d-none">Yeniden Başlat</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Oyun durumu ve kullanıcı bilgileri
+        const gameState = {
+            playerId: null,
+            playerName: '',
+            team: '',
+            role: '', // 'question' veya 'options'
+            connection: null
+        };
+
+        // DOM elementleri
+        const teamSelection = document.getElementById('teamSelection');
+        const gameContainer = document.getElementById('gameContainer');
+        const joinBtn = document.getElementById('joinBtn');
+        const playerNameInput = document.getElementById('playerName');
+        const teamSelect = document.getElementById('teamSelect');
+        const teamAPlayers = document.getElementById('teamAPlayers');
+        const teamBPlayers = document.getElementById('teamBPlayers');
+        const teamACount = document.getElementById('teamACount');
+        const teamBCount = document.getElementById('teamBCount');
+        const teamAScore = document.getElementById('teamAScore');
+        const teamBScore = document.getElementById('teamBScore');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const currentTeam = document.getElementById('currentTeam');
+        const questionInfo = document.getElementById('questionInfo');
+        const questionView = document.getElementById('questionView');
+        const waitingView = document.getElementById('waitingView');
+        const questionText = document.getElementById('questionText');
+        const optionsContainer = document.getElementById('optionsContainer');
+        const resetBtn = document.getElementById('resetBtn');
+
+        // SSE bağlantısını başlat
+        function connectSSE() {
+            if (gameState.connection) {
+                gameState.connection.close();
+            }
+
+            gameState.connection = new EventSource('quiz_sse.php?player_id=' + gameState.playerId);
+            
+            gameState.connection.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                handleServerEvent(data);
+            };
+            
+            gameState.connection.onerror = function() {
+                console.error('SSE bağlantı hatası');
+                setTimeout(connectSSE, 3000);
+            };
+        }
+
+        // Sunucudan gelen olayları işle
+        function handleServerEvent(data) {
+            switch (data.type) {
+                case 'player_joined':
+                    updateTeamDisplay(data.teams);
+                    break;
+                case 'game_start':
+                    startGame();
+                    break;
+                case 'new_question':
+                    showQuestion(data);
+                    break;
+                case 'time_update':
+                    updateTimer(data.time_left);
+                    break;
+                case 'show_answer':
+                    showCorrectAnswer(data.correct_answer);
+                    break;
+                case 'next_question':
+                    prepareNextQuestion(data);
+                    break;
+                case 'game_over':
+                    endGame(data.winner);
+                    break;
+                case 'score_update':
+                    updateScores(data.team_a_score, data.team_b_score);
+                    break;
+            }
+        }
+
+        // Takım bilgilerini güncelle
+        function updateTeamDisplay(teams) {
+            // A Takımı
+            teamAPlayers.innerHTML = '';
+            teams.A.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'player-card position-relative';
+                playerEl.textContent = player.name;
+                
+                if (player.role) {
+                    const badge = document.createElement('span');
+                    badge.className = `role-badge badge ${player.role === 'question' ? 'bg-info' : 'bg-warning'}`;
+                    badge.textContent = player.role === 'question' ? 'Soru' : 'Seçenekler';
+                    playerEl.appendChild(badge);
+                }
+                
+                teamAPlayers.appendChild(playerEl);
+            });
+            teamACount.textContent = `${teams.A.length}/2`;
+            
+            // B Takımı
+            teamBPlayers.innerHTML = '';
+            teams.B.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'player-card position-relative';
+                playerEl.textContent = player.name;
+                
+                if (player.role) {
+                    const badge = document.createElement('span');
+                    badge.className = `role-badge badge ${player.role === 'question' ? 'bg-info' : 'bg-warning'}`;
+                    badge.textContent = player.role === 'question' ? 'Soru' : 'Seçenekler';
+                    playerEl.appendChild(badge);
+                }
+                
+                teamBPlayers.appendChild(playerEl);
+            });
+            teamBCount.textContent = `${teams.B.length}/2`;
+        }
+
+        // Oyunu başlat
+        function startGame() {
+            waitingView.classList.add('d-none');
+            questionView.classList.remove('d-none');
+        }
+
+        // Soruyu göster
+        function showQuestion(data) {
+            currentTeam.textContent = `Sıra: ${data.team === 'A' ? 'A Takımı' : 'B Takımı'}`;
+            questionInfo.textContent = `Soru: ${data.question_number}/14`;
+            
+            // Eğer bu takımda değilsek, sadece izleyici modunda göster
+            if (gameState.team !== data.team) {
+                questionText.textContent = data.question;
+                
+                // Tüm seçenekleri göster ama etkileşimi devre dışı bırak
+                optionsContainer.innerHTML = '';
+                data.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'option-btn btn btn-outline-secondary';
+                    button.textContent = option;
+                    button.disabled = true;
+                    optionsContainer.appendChild(button);
+                });
+                
+                return;
+            }
+            
+            // Takım üyelerinden biri soruyu, diğeri seçenekleri görür
+            if (gameState.role === 'question') {
+                questionText.textContent = data.question;
+                optionsContainer.innerHTML = '<p class="text-muted">Seçenekleri takım arkadaşınız görüntülüyor</p>';
+            } else {
+                questionText.textContent = 'Soruyu takım arkadaşınız görüntülüyor';
+                
+                // Seçenekleri göster
+                optionsContainer.innerHTML = '';
+                data.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'option-btn btn btn-outline-primary';
+                    button.textContent = option;
+                    button.onclick = () => selectAnswer(option);
+                    optionsContainer.appendChild(button);
+                });
+            }
+        }
+
+        // Zamanlayıcıyı güncelle
+        function updateTimer(timeLeft) {
+            timerDisplay.textContent = timeLeft;
+            
+            // 10 saniyenin altında uyarı ver
+            if (timeLeft <= 10) {
+                timerDisplay.classList.add('text-danger');
+            } else {
+                timerDisplay.classList.remove('text-danger');
+            }
+        }
+
+        // Cevap seçildiğinde
+        function selectAnswer(answer) {
+            // Sunucuya cevabı gönder
+            fetch('quiz_api.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'answer',
+                    player_id: gameState.playerId,
+                    answer: answer
+                })
+            });
+            
+            // Tüm seçenekleri devre dışı bırak
+            const optionButtons = optionsContainer.querySelectorAll('button');
+            optionButtons.forEach(button => {
+                button.disabled = true;
+            });
+        }
+
+        // Doğru cevabı göster
+        function showCorrectAnswer(correctAnswer) {
+            const optionButtons = optionsContainer.querySelectorAll('button');
+            
+            optionButtons.forEach(button => {
+                if (button.textContent === correctAnswer) {
+                    button.classList.remove('btn-outline-primary');
+                    button.classList.add('btn-success');
+                } else {
+                    button.classList.remove('btn-outline-primary');
+                    button.classList.add('btn-outline-secondary');
+                }
+                
+                button.disabled = true;
+            });
+        }
+
+        // Sonraki soruya hazırlan
+        function prepareNextQuestion(data) {
+            // 7 saniye bekleyip sonra yeni soru gelecek
+            timerDisplay.textContent = '7';
+            
+            // Rolleri değiştir
+            if (gameState.team === data.next_team) {
+                gameState.role = data.next_roles[gameState.playerId];
+                
+                // Yeni rolü göster
+                const playerCards = document.querySelectorAll('.player-card');
+                playerCards.forEach(card => {
+                    if (card.textContent.includes(gameState.playerName)) {
+                        const badge = card.querySelector('.role-badge');
+                        if (badge) {
+                            badge.textContent = gameState.role === 'question' ? 'Soru' : 'Seçenekler';
+                            badge.className = `role-badge badge ${gameState.role === 'question' ? 'bg-info' : 'bg-warning'}`;
+                        }
+                    }
+                });
+            }
+        }
+
+        // Skorları güncelle
+        function updateScores(scoreA, scoreB) {
+            teamAScore.textContent = scoreA;
+            teamBScore.textContent = scoreB;
+        }
+
+        // Oyunu bitir
+        function endGame(winner) {
+            questionView.classList.add('d-none');
+            
+            const winnerEl = document.createElement('div');
+            winnerEl.className = 'alert alert-success text-center';
+            winnerEl.innerHTML = `
+                <h4>Oyun Bitti!</h4>
+                <p>Kazanan: <strong>${winner === 'A' ? 'A Takımı' : 'B Takımı'}</strong></p>
+                <p>Skor: A Takımı ${teamAScore.textContent} - ${teamBScore.textContent} B Takımı</p>
+            `;
+            
+            gameContainer.appendChild(winnerEl);
+            resetBtn.classList.remove('d-none');
+        }
+
+        // Oyuna katıl butonu
+        joinBtn.addEventListener('click', () => {
+            const name = playerNameInput.value.trim();
+            const team = teamSelect.value;
+            
+            if (!name || !team) {
+                alert('Lütfen bir kullanıcı adı ve takım seçin.');
+                return;
+            }
+            
+            gameState.playerName = name;
+            gameState.team = team;
+            
+            // Sunucuya katılma isteği gönder
+            fetch('quiz_api.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'join',
+                    player_name: name,
+                    team: team
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    gameState.playerId = data.player_id;
+                    gameState.role = data.role;
+                    
+                    // UI güncelleme
+                    teamSelection.classList.add('d-none');
+                    gameContainer.classList.remove('d-none');
+                    
+                    // SSE bağlantısını başlat
+                    connectSSE();
+                } else {
+                    alert('Katılım başarısız: ' + data.message);
+                }
+            });
+        });
+
+        // Reset butonu
+        resetBtn.addEventListener('click', () => {
+            fetch('quiz_api.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'reset'
+                })
+            })
+            .then(() => {
+                location.reload();
+            });
+        });
+    </script>
+</body>
+</html>

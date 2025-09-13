@@ -1,0 +1,72 @@
+[
+    {
+        "question": "Which phrase appears at the beginning of almost every chapter (surah) in the Qur'an?",
+        "options": ["Inna lillahi wa inna ilayhi raji'un", "Bismillahirrahmanirrahim", "Allahu Akbar", "La ilaha illallah"],
+        "correct_answer": "Bismillahirrahmanirrahim",
+        "category": "religion",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Which animal is known as the fastest land animal?",
+        "options": ["Lion", "Tiger", "Cheetah", "Leopard"],
+        "correct_answer": "Cheetah",
+        "category": "animals",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which is the largest desert in the world?",
+        "options": ["Gobi Desert", "Sahara Desert", "Antarctic Desert", "Kalahari Desert"],
+        "correct_answer": "Antarctic Desert",
+        "category": "geography",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Which organ in the human body pumps blood throughout the body?",
+        "options": ["Brain", "Lungs", "Heart", "Kidneys"],
+        "correct_answer": "Heart",
+        "category": "biology",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which animal is known as the king of the jungle?",
+        "options": ["Tiger", "Lion", "Elephant", "Leopard"],
+        "correct_answer": "Lion",
+        "category": "animals",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which bird is famous for its ability to mimic human speech?",
+        "options": ["Crow", "Parrot", "Owl", "Sparrow"],
+        "correct_answer": "Parrot",
+        "category": "animals",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which planet is known as the 'Red Planet'?",
+        "options": ["Jupiter", "Venus", "Mars", "Saturn"],
+        "correct_answer": "Mars",
+        "category": "space",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which planet has the most moons?",
+        "options": ["Jupiter", "Saturn", "Mars", "Neptune"],
+        "correct_answer": "Saturn",
+        "category": "space",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Which planet is closest to the Sun?",
+        "options": ["Mercury", "Venus", "Earth", "Mars"],
+        "correct_answer": "Mercury",
+        "category": "space",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Which is the largest continent on Earth?",
+        "options": ["Africa", "Asia", "Europe", "South America"],
+        "correct_answer": "Asia",
+        "category": "geography",
+        "difficulty": "easy"
+    }
+]

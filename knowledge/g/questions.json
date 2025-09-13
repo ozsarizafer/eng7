@@ -1,0 +1,156 @@
+[
+    {
+        "question": "Kur'an'daki hemen hemen her surenin başında hangi ifade yer alır?",
+        "options": ["Inna lillahi wa inna ilayhi raji'un", "Bismillahirrahmanirrahim", "Allahu Akbar", "La ilaha illallah"],
+        "correct_answer": "Bismillahirrahmanirrahim",
+        "category": "religion",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Hangi hayvan en hızlı kara hayvanı olarak bilinir?",
+        "options": ["Aslan", "Kaplan", "Çita", "Leopar"],
+        "correct_answer": "Çita",
+        "category": "animals",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Dünyanın en büyük çölü hangisidir?",
+        "options": ["Gobi Çölü", "Sahra Çölü", "Antarktika Çölü", "Kalahari Çölü"],
+        "correct_answer": "Antarktika Çölü",
+        "category": "geography",
+        "difficulty": "medium"
+    },
+    {
+        "question": "İnsan vücudunda kanı pompalayan organ hangisidir?",
+        "options": ["Beyin", "Akciğerler", "Kalp", "Böbrekler"],
+        "correct_answer": "Kalp",
+        "category": "biology",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Adaleti temsil etmek için sıklıkla hangi sembol kullanılır?",
+        "options": ["Kılıç", "Terazi", "Taç", "Kitap"],
+        "correct_answer": "Terazi",
+        "category": "culture",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Pizzayı icat etmesiyle ünlü olan ülke hangisidir?",
+        "options": ["İspanya", "İtalya", "Fransa", "Türkiye"],
+        "correct_answer": "İtalya",
+        "category": "food",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Hangi gezegen 'Kızıl Gezegen' olarak bilinir?",
+        "options": ["Jüpiter", "Venüs", "Mars", "Satürn"],
+        "correct_answer": "Mars",
+        "category": "space",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Hangi hayvan ormanların kralı olarak bilinir?",
+        "options": ["Kaplan", "Aslan", "Fil", "Leopar"],
+        "correct_answer": "Aslan",
+        "category": "animals",
+        "difficulty": "easy"
+    },
+    {
+        "question": "İnsan konuşmasını taklit etme yeteneğiyle ünlü olan kuş hangisidir?",
+        "options": ["Karga", "Papağan", "Baykuş", "Serçe"],
+        "correct_answer": "Papağan",
+        "category": "animals",
+        "difficulty": "easy"
+    },
+    {
+        "question": "En büyük yumurtaları hangi hayvan yumurtlar?",
+        "options": ["Devekuşu", "Tavuk", "Kaplumbağa", "Kartal"],
+        "correct_answer": "Devekuşu",
+        "category": "animals",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Hangi deniz canlısının sekiz kolu vardır?",
+        "options": ["Kalamar", "Köpekbalığı", "Ahtapot", "Fok"],
+        "correct_answer": "Ahtapot",
+        "category": "animals",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Yeryüzündeki en büyük kıta hangisidir?",
+        "options": ["Afrika", "Asya", "Avrupa", "Güney Amerika"],
+        "correct_answer": "Asya",
+        "category": "geography",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Dünyanın en uzun sahil şeridine sahip ülke hangisidir?",
+        "options": ["Avustralya", "Kanada", "Rusya", "ABD"],
+        "correct_answer": "Kanada",
+        "category": "geography",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Everest Dağı hangi sıradağlarda yer almaktadır?",
+        "options": ["And Dağları", "Himalayalar", "Kayalık Dağlar", "Alpler"],
+        "correct_answer": "Himalayalar",
+        "category": "geography",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Alan olarak en küçük okyanus hangisidir?",
+        "options": ["Hint Okyanusu", "Arktik Okyanusu", "Atlantik Okyanusu", "Pasifik Okyanusu"],
+        "correct_answer": "Arktik Okyanusu",
+        "category": "geography",
+        "difficulty": "medium"
+    },
+    {
+        "question": "İnsanların nefes almasına yardımcı olan organ hangisidir?",
+        "options": ["Kalp", "Beyin", "Akciğerler", "Böbrekler"],
+        "correct_answer": "Akciğerler",
+        "category": "biology",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Boyutuna göre insan vücudundaki en güçlü kas hangisidir?",
+        "options": ["Dil", "Kalp", "Çene (Masseter)", "Bacak (Kuadriseps)"],
+        "correct_answer": "Çene (Masseter)",
+        "category": "biology",
+        "difficulty": "hard"
+    },
+    {
+        "question": "İnsan vücudunun hangi bölümünde en çok kemik bulunur?",
+        "options": ["El", "Ayak", "Omurga", "Kafatası"],
+        "correct_answer": "El",
+        "category": "biology",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Hangi kan grubu evrensel donör olarak bilinir?",
+        "options": ["A", "B", "AB", "0 negatif"],
+        "correct_answer": "0 negatif",
+        "category": "biology",
+        "difficulty": "hard"
+    },
+    {
+        "question": "Adalet tanrıçası Themis'in bir elinde geleneksel olarak ne bulunur?",
+        "options": ["Kılıç", "Terazi", "Kitap", "Taç"],
+        "correct_answer": "Terazi",
+        "category": "culture",
+        "difficulty": "easy"
+    },
+    {
+        "question": "Adalet heykeli genellikle neyin üzerinde durur?",
+        "options": ["Bulutlar", "Bir yılan", "Bir kaide", "Bir dağ"],
+        "correct_answer": "Bir kaide",
+        "category": "culture",
+        "difficulty": "medium"
+    },
+    {
+        "question": "Adalet sembolüne hangi Roma tanrıçası ilham vermiştir?",
+        "options": ["Venüs", "Justitia", "Minerva", "Diana"],
+        "correct_answer": "Justitia",
+        "category": "culture",
+        "difficulty": "hard"
+    }
+]

@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Takım Bilgi Yarışması</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .team-selection, .waiting-room, .game-room, .score-board, .game-over {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .team-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .team-btn {
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .team-a {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .team-b {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .team-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .player-list {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        
+        .team-players {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            width: 45%;
+        }
+        
+        .team-a-players {
+            background-color: rgba(52, 152, 219, 0.1);
+            border: 2px solid #3498db;
+        }
+        
+        .team-b-players {
+            background-color: rgba(231, 76, 60, 0.1);
+            border: 2px solid #e74c3c;
+        }
+        
+        .player {
+            padding: 10px;
+            margin: 8px 0;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .game-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .timer {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 10px;
+            background-color: #2c3e50;
+            color: white;
+            border-radius: 8px;
+        }
+        
+        .question-section {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .question-part, .options-part {
+            flex: 1;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .question-part {
+            border-left: 5px solid #3498db;
+        }
+        
+        .options-part {
+            border-left: 5px solid #e74c3c;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .option-btn {
+            padding: 12px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .option-btn:hover {
+            background-color: #e9ecef;
+        }
+        
+        .option-btn.selected {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        
+        .next-btn, .reveal-btn {
+            padding: 12px 24px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .next-btn:hover, .reveal-btn:hover {
+            background-color: #27ae60;
+        }
+        
+        .next-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .score-display {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .team-a-score {
+            color: #3498db;
+        }
+        
+        .team-b-score {
+            color: #e74c3c;
+        }
+        
+        .game-over {
+            text-align: center;
+        }
+        
+        .winner {
+            font-size: 28px;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .team-a-winner {
+            background-color: rgba(52, 152, 219, 0.2);
+            color: #3498db;
+        }
+        
+        .team-b-winner {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+        }
+        
+        .draw {
+            background-color: rgba(243, 156, 18, 0.2);
+            color: #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Takım Bilgi Yarışması</h1>
+        </header>
+        
+        <div id="teamSelection" class="team-selection">
+            <h2>Takımını Seç</h2>
+            <div class="team-buttons">
+                <button class="team-btn team-a" onclick="joinTeam('A')">A Takımına Katıl</button>
+                <button class="team-btn team-b" onclick="joinTeam('B')">B Takımına Katıl</button>
+            </div>
+        </div>
+        
+        <div id="waitingRoom" class="waiting-room hidden">
+            <h2>Oyun Başlamak İçin Oyuncular Bekleniyor</h2>
+            <div class="player-list">
+                <div class="team-players team-a-players">
+                    <h3>A Takımı</h3>
+                    <div id="teamAPlayers"></div>
+                </div>
+                <div class="team-players team-b-players">
+                    <h3>B Takımı</h3>
+                    <div id="teamBPlayers"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="gameRoom" class="game-room hidden">
+            <h2 id="currentTeamDisplay">Soru: A Takımı</h2>
+            <div class="timer" id="timer">01:00</div>
+            
+            <div class="question-section">
+                <div class="question-part">
+                    <h3>Soru</h3>
+                    <p id="questionText">Soru yükleniyor...</p>
+                </div>
+                <div class="options-part">
+                    <h3>Seçenekler</h3>
+                    <div class="options-grid" id="optionsContainer">
+                        <!-- Options will be inserted here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="reveal-btn" id="revealBtn" onclick="revealAnswer()">Cevabı Göster</button>
+                <button class="next-btn" id="nextBtn" onclick="nextQuestion()" disabled>Sonraki Soru</button>
+            </div>
+        </div>
+        
+        <div id="scoreBoard" class="score-board hidden">
+            <h2>Skor Durumu</h2>
+            <div class="score-display">
+                <div class="team-a-score">A Takımı: <span id="teamAScore">0</span></div>
+                <div class="team-b-score">B Takımı: <span id="teamBScore">0</span></div>
+            </div>
+        </div>
+        
+        <div id="gameOver" class="game-over hidden">
+            <h2>Oyun Bitti!</h2>
+            <div id="winnerAnnouncement" class="winner"></div>
+            <button class="next-btn" onclick="resetGame()">Yeni Oyun</button>
+        </div>
+    </div>
+
+    <script>
+        // Oyun durumu
+        const gameState = {
+            players: {
+                A: [],
+                B: []
+            },
+            currentPlayer: {
+                A: 0, // 0: Soruyu gören, 1: Seçenekleri gören
+                B: 0
+            },
+            currentTeam: 'A',
+            questions: [],
+            currentQuestionIndex: -1,
+            scores: {
+                A: 0,
+                B: 0
+            },
+            answeredQuestions: 0,
+            totalQuestions: 7,
+            timer: 60,
+            timerInterval: null,
+            playerTeam: null,
+            playerId: null
+        };
+
+        // Soru veritabanı
+        const questions = [
+            {
+                "question": "Which phrase appears at the beginning of almost every chapter (surah) in the Qur'an?",
+                "options": ["Inna lillahi wa inna ilayhi raji'un", "Bismillahirrahmanirrahim", "Allahu Akbar", "La ilaha illallah"],
+                "correct_answer": "Bismillahirrahmanirrahim",
+                "category": "religion",
+                "difficulty": "medium"
+            },
+            {
+                "question": "Which animal is known as the fastest land animal?",
+                "options": ["Lion", "Tiger", "Cheetah", "Leopard"],
+                "correct_answer": "Cheetah",
+                "category": "animals",
+                "difficulty": "easy"
+            },
+            {
+                "question": "Which is the largest desert in the world?",
+                "options": ["Gobi Desert", "Sahara Desert", "Antarctic Desert", "Kalahari Desert"],
+                "correct_answer": "Antarctic Desert",
+                "category": "geography",
+                "difficulty": "medium"
+            },
+            {
+                "question": "Which organ in the human body pumps blood throughout the body?",
+                "options": ["Brain", "Lungs", "Heart", "Kidneys"],
+                "correct_answer": "Heart",
+                "category": "biology",
+                "difficulty": "easy"
+            },
+            {
+                "question": "What symbol is often used to represent justice in many cultures?",
+                "options": ["A sword", "A scale", "A crown", "A book"],
+                "correct_answer": "A scale",
+                "category": "culture",
+                "difficulty": "easy"
+            },
+            {
+                "question": "Which country is famous for inventing pizza?",
+                "options": ["Spain", "Italy", "France", "Turkey"],
+                "correct_answer": "Italy",
+                "category": "food",
+                "difficulty": "easy"
+            },
+            {
+                "question": "Which planet is known as the 'Red Planet'?",
+                "options": ["Jupiter", "Venus", "Mars", "Saturn"],
+                "correct_answer": "Mars",
+                "category": "space",
+                "difficulty": "easy"
+            }
+        ];
+
+        // Sayfa yüklendiğinde
+        window.onload = function() {
+            // Rastgele soruları seç (zaman bazlı)
+            selectRandomQuestions();
+            
+            // Benzersiz bir kullanıcı ID'si oluştur
+            gameState.playerId = 'player_' + Math.floor(Math.random() * 10000);
+        };
+
+        // Takıma katılma
+        function joinTeam(team) {
+            gameState.playerTeam = team;
+            
+            // Kullanıcıyı takıma ekle
+            const playerName = prompt("Lütfen adınızı girin:");
+            if (playerName) {
+                gameState.players[team].push({
+                    id: gameState.playerId,
+                    name: playerName
+                });
+                
+                // Arayüzü güncelle
+                document.getElementById('teamSelection').classList.add('hidden');
+                document.getElementById('waitingRoom').classList.remove('hidden');
+                updatePlayersList();
+                
+                // 4 oyuncu tamamlandı mı kontrol et
+                checkIfGameCanStart();
+            }
+        }
+
+        // Oyuncu listesini güncelle
+        function updatePlayersList() {
+            const teamAPlayers = document.getElementById('teamAPlayers');
+            const teamBPlayers = document.getElementById('teamBPlayers');
+            
+            teamAPlayers.innerHTML = '';
+            teamBPlayers.innerHTML = '';
+            
+            gameState.players.A.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'player';
+                playerEl.textContent = player.name;
+                teamAPlayers.appendChild(playerEl);
+            });
+            
+            gameState.players.B.forEach(player => {
+                const playerEl = document.createElement('div');
+                playerEl.className = 'player';
+                playerEl.textContent = player.name;
+                teamBPlayers.appendChild(playerEl);
+            });
+        }
+
+        // Oyun başlayabilir mi kontrol et
+        function checkIfGameCanStart() {
+            if (gameState.players.A.length + gameState.players.B.length >= 4) {
+                // Oyunu başlat
+                setTimeout(startGame, 2000);
+            }
+        }
+
+        // Oyunu başlat
+        function startGame() {
+            document.getElementById('waitingRoom').classList.add('hidden');
+            document.getElementById('gameRoom').classList.remove('hidden');
+            document.getElementById('scoreBoard').classList.remove('hidden');
+            
+            // İlk soruyu göster
+            nextQuestion();
+        }
+
+        // Rastgele soruları seç (zaman bazlı)
+        function selectRandomQuestions() {
+            const now = new Date();
+            const seed = now.getMilliseconds();
+            
+            // Mevcut soruları karıştır
+            const shuffledQuestions = [...questions].sort(() => 0.5 - Math.random());
+            
+            // Toplam soru sayısı kadar seç
+            gameState.questions = shuffledQuestions.slice(0, gameState.totalQuestions * 2);
+        }
+
+        // Sonraki soru
+        function nextQuestion() {
+            clearInterval(gameState.timerInterval);
+            
+            gameState.currentQuestionIndex++;
+            gameState.answeredQuestions++;
+            
+            // Tüm sorular bitti mi kontrol et
+            if (gameState.answeredQuestions > gameState.totalQuestions * 2) {
+                endGame();
+                return;
+            }
+            
+            // Takım sırasını değiştir
+            gameState.currentTeam = gameState.currentTeam === 'A' ? 'B' : 'A';
+            
+            // Takım içi sırayı değiştir
+            gameState.currentPlayer[gameState.currentTeam] = gameState.currentPlayer[gameState.currentTeam] === 0 ? 1 : 0;
+            
+            // Soruyu göster
+            showQuestion();
+            
+            // Zamanlayıcıyı sıfırla
+            gameState.timer = 60;
+            document.getElementById('timer').textContent = formatTime(gameState.timer);
+            
+            // Butonları sıfırla
+            document.getElementById('nextBtn').disabled = true;
+            document.getElementById('revealBtn').disabled = false;
+            
+            // Zamanlayıcıyı başlat
+            startTimer();
+        }
+
+        // Soruyu göster
+        function showQuestion() {
+            const question = gameState.questions[gameState.currentQuestionIndex];
+            document.getElementById('currentTeamDisplay').textContent = `Soru: ${gameState.currentTeam} Takımı`;
+            document.getElementById('questionText').textContent = question.question;
+            
+            // Seçenekleri oluştur
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = '';
+            
+            question.options.forEach(option => {
+                const optionBtn = document.createElement('button');
+                optionBtn.className = 'option-btn';
+                optionBtn.textContent = option;
+                optionBtn.onclick = () => selectOption(optionBtn, option);
+                optionsContainer.appendChild(optionBtn);
+            });
+            
+            // Kullanıcının rolüne göre içeriği göster/gizle
+            if (gameState.playerTeam === gameState.currentTeam) {
+                // Aynı takımdaki kullanıcı
+                if (gameState.currentPlayer[gameState.currentTeam] === 0) {
+                    // Soruyu gören kullanıcı
+                    document.querySelector('.options-part').classList.add('hidden');
+                    document.querySelector('.question-part').classList.remove('hidden');
+                } else {
+                    // Seçenekleri gören kullanıcı
+                    document.querySelector('.question-part').classList.add('hidden');
+                    document.querySelector('.options-part').classList.remove('hidden');
+                }
+            } else {
+                // Karşı takımdaki kullanıcı
+                document.querySelector('.question-part').classList.remove('hidden');
+                document.querySelector('.options-part').classList.remove('hidden');
+                
+                // Seçenekleri devre dışı bırak
+                const optionBtns = document.querySelectorAll('.option-btn');
+                optionBtns.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.cursor = 'not-allowed';
+                });
+            }
+        }
+
+        // Seçenek seçme
+        function selectOption(btn, option) {
+            // Önceki seçimleri temizle
+            const optionBtns = document.querySelectorAll('.option-btn');
+            optionBtns.forEach(btn => btn.classList.remove('selected'));
+            
+            // Yeni seçimi işaretle
+            btn.classList.add('selected');
+            
+            // Doğru cevabı kontrol et
+            const question = gameState.questions[gameState.currentQuestionIndex];
+            if (option === question.correct_answer) {
+                // Doğru cevap
+                gameState.scores[gameState.currentTeam]++;
+                updateScores();
+                
+                // Cevabı göster
+                revealAnswer();
+            }
+        }
+
+        // Cevabı göster
+        function revealAnswer() {
+            clearInterval(gameState.timerInterval);
+            
+            const question = gameState.questions[gameState.currentQuestionIndex];
+            
+            // Tüm seçenekleri göster
+            const optionBtns = document.querySelectorAll('.option-btn');
+            optionBtns.forEach(btn => {
+                if (btn.textContent === question.correct_answer) {
+                    btn.style.backgroundColor = '#2ecc71';
+                    btn.style.color = 'white';
+                } else {
+                    btn.style.backgroundColor = '#e74c3c';
+                    btn.style.color = 'white';
+                }
+                btn.disabled = true;
+            });
+            
+            // Sonraki soru butonunu etkinleştir
+            document.getElementById('nextBtn').disabled = false;
+            document.getElementById('revealBtn').disabled = true;
+        }
+
+        // Zamanlayıcıyı başlat
+        function startTimer() {
+            gameState.timerInterval = setInterval(() => {
+                gameState.timer--;
+                document.getElementById('timer').textContent = formatTime(gameState.timer);
+                
+                if (gameState.timer <= 0) {
+                    clearInterval(gameState.timerInterval);
+                    revealAnswer();
+                }
+            }, 1000);
+        }
+
+        // Zamanı formatla
+        function formatTime(seconds) {
+            return `${seconds.toString().padStart(2, '0')}:00`;
+        }
+
+        // Skorları güncelle
+        function updateScores() {
+            document.getElementById('teamAScore').textContent = gameState.scores.A;
+            document.getElementById('teamBScore').textContent = gameState.scores.B;
+        }
+
+        // Oyunu bitir
+        function endGame() {
+            document.getElementById('gameRoom').classList.add('hidden');
+            document.getElementById('gameOver').classList.remove('hidden');
+            
+            const winnerAnnouncement = document.getElementById('winnerAnnouncement');
+            
+            if (gameState.scores.A > gameState.scores.B) {
+                winnerAnnouncement.textContent = 'Kazanan: A Takımı!';
+                winnerAnnouncement.className = 'winner team-a-winner';
+            } else if (gameState.scores.B > gameState.scores.A) {
+                winnerAnnouncement.textContent = 'Kazanan: B Takımı!';
+                winnerAnnouncement.className = 'winner team-b-winner';
+            } else {
+                winnerAnnouncement.textContent = 'Berabere!';
+                winnerAnnouncement.className = 'winner draw';
+            }
+        }
+
+        // Oyunu sıfırla
+        function resetGame() {
+            // Oyun durumunu sıfırla
+            gameState.players = { A: [], B: [] };
+            gameState.currentPlayer = { A: 0, B: 0 };
+            gameState.currentTeam = 'A';
+            gameState.currentQuestionIndex = -1;
+            gameState.scores = { A: 0, B: 0 };
+            gameState.answeredQuestions = 0;
+            gameState.playerTeam = null;
+            
+            // Rastgele soruları yeniden seç
+            selectRandomQuestions();
+            
+            // Arayüzü sıfırla
+            document.getElementById('gameOver').classList.add('hidden');
+            document.getElementById('teamSelection').classList.remove('hidden');
+            updateScores();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+/* Genel */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #f4f4f9;
+    color: #333;
+    text-align: center;
+}
+
+h1, h2 {
+    margin-bottom: 15px;
+}
+
+/* Form alanları */
+form {
+    margin: 15px 0;
+}
+
+input[type="text"], select {
+    padding: 10px;
+    margin: 5px;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+button {
+    padding: 10px 15px;
+    font-size: 1em;
+    cursor: pointer;
+    background: #0077ff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+}
+
+button:hover {
+    background: #005fcc;
+}
+
+/* Soru ve seçenekler */
+#game_area {
+    margin: 20px auto;
+    max-width: 600px;
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    text-align: left;
+}
+
+#game_area h2 {
+    margin-top: 0;
+}
+
+#game_area ul {
+    list-style: none;
+    padding: 0;
+}
+
+#game_area li {
+    margin: 10px 0;
+}
+
+#game_area button.answer {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #f9f9f9;
+    text-align: left;
+}
+
+#game_area button.answer:hover {
+    background: #e6f0ff;
+    border-color: #0077ff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    #game_area {
+        padding: 15px;
+    }
+    button, input[type="text"], select {
+        width: 100%;
+        margin: 5px 0;
+    }
+}
