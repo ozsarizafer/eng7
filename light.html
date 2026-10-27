@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI LED</title>
+<style>
+:root{--bg:#f4f5f8;--fg:#14161c;--mut:#6a7080;--card:#fff;--bd:#dfe2ea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d0f14;--fg:#eef0f6;--mut:#8b92a5;--card:#161922;--bd:#262b38}}
+:root[data-theme="dark"]{--bg:#0d0f14;--fg:#eef0f6;--mut:#8b92a5;--card:#161922;--bd:#262b38}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;height:100%;background:#000;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+h1{display:none}
+.stage{position:fixed;left:0;right:0;bottom:0;z-index:2;display:flex;flex-direction:column;align-items:center;gap:12px;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.led{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:0;background:var(--c,#444);opacity:var(--o,.08);transition:background .4s,opacity .4s}
+.led.on{border-color:transparent}
+.led.blink{animation:bl .5s steps(2) infinite}
+.led.rainbow{animation:rb 3s linear infinite}
+@keyframes bl{50%{opacity:.05;box-shadow:none}}
+@keyframes rb{to{filter:hue-rotate(360deg)}}
+.status{font-size:.95rem;color:#fff;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);padding:8px 16px;border-radius:20px;text-align:center;max-width:90vw}
+.bar{position:fixed;top:0;left:0;right:0;height:4px;background:rgba(0,0,0,.35);overflow:hidden;z-index:3}
+.bar i{display:block;height:100%;width:var(--p,0%);background:var(--c,#888);transition:width .3s}
+.ai{pointer-events:auto;width:92px;height:92px;border-radius:50%;border:0;cursor:pointer;font-size:1.15rem;font-weight:700;color:#fff;background:linear-gradient(135deg,#6a5cff,#d04bff);box-shadow:0 8px 24px rgba(106,92,255,.4);transition:transform .15s}
+.ai:active{transform:scale(.94)}
+.ai.listen{animation:pu 1s ease-in-out infinite}
+@keyframes pu{50%{box-shadow:0 0 0 18px rgba(208,75,255,.18)}}
+.fb{display:none;width:100%;max-width:420px;gap:8px;pointer-events:auto}
+.fb.show{display:flex}
+.fb input{flex:1;padding:12px;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--fg);font-size:1rem}
+.fb button{padding:0 16px;border-radius:10px;border:0;background:#6a5cff;color:#fff;font-weight:600}
+.hint{font-size:.75rem;color:#fff;background:rgba(0,0,0,.45);padding:6px 12px;border-radius:14px;text-align:center;max-width:90vw;line-height:1.4}
+@media (min-width:700px){.ai{width:104px;height:104px}}
+</style>
+</head>
+<body>
+<h1>AI LED</h1>
+<div class="stage">
+  <div class="led" id="led"></div>
+  <div class="bar"><i id="bar"></i></div>
+  <div class="status" id="st">Always listening, just talk. Hold AI to switch EN / Türkçe</div>
+  <button class="ai" id="ai" aria-label="AI command">AI</button>
+  <div class="fb" id="fb"><input id="tx" placeholder="Type a command" autocomplete="off"><button id="go">Go</button></div>
+  <div class="hint">Try: “turn on”, “red”, “blue 50%”, “warm light”, “blink”, “rainbow”, “dimmer”, “off”</div>
+</div>
+<script>
+(function(){
+var COLORS={red:"#ff2d2d",green:"#22e05a",blue:"#2f6bff",yellow:"#ffe629",orange:"#ff8a1f",purple:"#a53bff",pink:"#ff5fb8",cyan:"#19e6e6",white:"#ffffff",warm:"#ffb561",cool:"#bcd8ff"};
+var s={on:false,c:"#ffffff",b:80,fx:""};
+var led=document.getElementById("led"),bar=document.getElementById("bar"),st=document.getElementById("st"),
+    ai=document.getElementById("ai"),fb=document.getElementById("fb"),tx=document.getElementById("tx");
+function render(){
+  led.style.setProperty("--c",s.c);
+  led.style.setProperty("--o",s.on?(0.25+s.b/100*0.75):0.08);
+  led.className="led"+(s.on?" on":"")+(s.on&&s.fx?" "+s.fx:"");
+  bar.style.setProperty("--p",(s.on?s.b:0)+"%");
+  bar.style.setProperty("--c",s.c);
+}
+function say(t){st.textContent=t}
+function norm(t){
+  t=t.replace(/[.,!?]/g,"").replace(/yanıp\s*sön/g,"blink");
+  var M={"kırmızı":"red","yeşil":"green","mavi":"blue","sarı":"yellow","turuncu":"orange","mor":"purple","pembe":"pink","turkuaz":"cyan","beyaz":"white","sıcak":"warm","soğuk":"cool","aç":"on","yak":"on","aydınlat":"on","kapat":"off","söndür":"off","gökkuşağı":"rainbow","parti":"party","disko":"disco","yarım":"half","tam":"full","maksimum":"max","kıs":"dimmer","azalt":"dimmer","loş":"dimmer","parlak":"brighter","artır":"brighter","sabit":"steady","dur":"stop","on":"on","ten":"10","twenty":"20","thirty":"30","forty":"40","fifty":"50","sixty":"60","seventy":"70","eighty":"80","ninety":"90","hundred":"100","yirmi":"20","otuz":"30","kırk":"40","elli":"50","altmış":"60","yetmiş":"70","seksen":"80","doksan":"90","yüz":"100"};
+  t=t.split(/\s+/).map(function(w){return M[w]||w}).join(" ");
+  return t.replace(/(?:yüzde|percent)\s*(\d+)/g,"$1%").replace(/(\d+)\s*percent/g,"$1%").replace(/%\s*(\d+)/g,"$1%");
+}
+function run(raw){
+  var t=norm((raw||"").toLowerCase()),done=[];
+  if(!t.trim()){say("Didn’t catch that, try again");return}
+  var m=t.match(/(\d{1,3})\s*(%|percent)?/);
+  if(/\b(off|turn off|shut|dark|sleep)\b/.test(t)){s.on=false;s.fx="";done.push("off")}
+  else{
+    if(/\b(on|turn on|light up|lights?|start)\b/.test(t)){s.on=true;done.push("on")}
+    for(var k in COLORS){if(t.indexOf(k)>-1){s.c=COLORS[k];s.on=true;s.fx="";done.push(k)}}
+    if(m&&(m[2]||/bright|dim|level|set/.test(t))){s.b=Math.max(5,Math.min(100,+m[1]));s.on=true;done.push(s.b+"%")}
+    else if(/\b(half)\b/.test(t)){s.b=50;s.on=true;done.push("50%")}
+    else if(/\b(max|full|brightest)\b/.test(t)){s.b=100;s.on=true;done.push("100%")}
+    else if(/\b(dim|dimmer|lower|darker|less)\b/.test(t)){s.b=Math.max(5,s.b-25);s.on=true;done.push("dimmer")}
+    else if(/\b(bright|brighter|higher|more)\b/.test(t)){s.b=Math.min(100,s.b+25);s.on=true;done.push("brighter")}
+    if(/\b(blink|flash|strobe)\b/.test(t)){s.fx="blink";s.on=true;done.push("blink")}
+    if(/\b(rainbow|party|disco)\b/.test(t)){s.fx="rainbow";s.on=true;done.push("rainbow")}
+    if(/\b(steady|stop|solid|normal)\b/.test(t)){s.fx="";done.push("steady")}
+  }
+  render();
+  say(done.length?("Done: "+done.join(", ")):("Didn’t understand “"+raw+"”"));
+}
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition,rec=null,busy=false,want=false,longp=false,pt=null,listen=function(){},lang=(navigator.language||"en-US").toLowerCase().indexOf("tr")===0?"tr-TR":"en-US";
+if(!SR){fb.className="fb show";say("Voice not supported here, type a command")}
+else{
+  rec=new SR();rec.lang=lang;rec.interimResults=false;rec.continuous=true;rec.maxAlternatives=1;
+  rec.onresult=function(e){for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)run(e.results[i][0].transcript)}};
+  rec.onerror=function(e){var c=e.error;if(c==="no-speech"||c==="aborted")return;if((c==="not-allowed"||c==="service-not-allowed")&&!gest){want=false;say("Tap anywhere to start listening");return}if(c==="not-allowed"||c==="service-not-allowed"){want=false;fb.className="fb show";say(window.self!==window.top?"Mic is blocked inside this embedded view. Open the page link in its own browser tab":"Mic blocked. Tap the lock icon in the address bar, allow Microphone, then reload")}else if(c==="network"){want=false;fb.className="fb show";say("Voice needs internet. Or type a command")}else say("Voice error: "+c)};
+  rec.onend=function(){busy=false;ai.classList.remove("listen");if(want)setTimeout(function(){listen(true)},250)};listen=function(q){try{rec.lang=lang;rec.start();busy=true;ai.classList.add("listen");if(!q)say("Listening… ("+(lang==="tr-TR"?"Türkçe":"English")+")")}catch(e){}};
+}
+ai.addEventListener("click",function(){
+  if(!rec){tx.focus();return}
+  if(longp){longp=false;return}
+  if(want)return;
+  muted=false;want=true;listen();
+});
+ai.addEventListener("pointerdown",function(){longp=false;pt=setTimeout(function(){longp=true;lang=lang==="tr-TR"?"en-US":"tr-TR";say("Language: "+(lang==="tr-TR"?"Türkçe":"English"));if(rec&&want)rec.stop()},700)});
+["pointerup","pointerleave","pointercancel"].forEach(function(n){ai.addEventListener(n,function(){clearTimeout(pt)})});
+function sendTyped(){run(tx.value);tx.value=""}
+document.getElementById("go").addEventListener("click",sendTyped);
+var muted=false,gest=false,wl=null;
+function keepAwake(){try{if(navigator.wakeLock)navigator.wakeLock.request("screen").then(function(l){wl=l}).catch(function(){})}catch(e){}}
+if(rec){
+  want=true;listen(true);keepAwake();
+  document.addEventListener("pointerdown",function(e){gest=true;if(e.target===ai)return;keepAwake();if(!want&&!muted){want=true;listen(true)}});
+  document.addEventListener("visibilitychange",function(){if(!document.hidden){keepAwake();if(want&&!busy)listen(true)}});
+  setInterval(function(){if(want&&!busy)listen(true)},3000);
+}
+tx.addEventListener("keydown",function(e){if(e.key==="Enter")sendTyped()});
+render();
+})();
+</script>
+</body>
+</html>
